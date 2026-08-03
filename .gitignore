@@ -10,3 +10,5 @@ coverage/
 *.tsbuildinfo
 backups/*.sql.gz
 !backups/.gitkeep
+
+.vercel
