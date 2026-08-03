@@ -1,0 +1,31 @@
+{
+  "name": "kids-calendar",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Gedeelde kinderregeling PWA voor ouders",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "dev:api": "npm run dev -w @kids-calendar/api",
+    "dev:web": "npm run dev -w @kids-calendar/web",
+    "build": "npm run build -w @kids-calendar/shared && npm run build -w @kids-calendar/api && npm run build -w @kids-calendar/web",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "db:migrate": "npm run db:migrate -w @kids-calendar/api",
+    "db:seed": "npm run db:seed -w @kids-calendar/api",
+    "user:create": "npm run user:create -w @kids-calendar/api",
+    "users:test": "npm run users:test -w @kids-calendar/api",
+    "backup": "node scripts/backup.js",
+    "restore": "node scripts/restore.js",
+    "icons": "node scripts/generate-icons.js",
+    "postinstall": "node scripts/generate-icons.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
