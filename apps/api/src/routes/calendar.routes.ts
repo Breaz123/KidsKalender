@@ -21,6 +21,16 @@ import {
 export async function calendarRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAuth);
 
+  app.get('/today', async () => {
+    const today = new Date().toLocaleString('en-CA', {
+      timeZone: 'Europe/Brussels',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).slice(0, 10);
+    return { today };
+  });
+
   app.get('/', async (request, reply) => {
     const { year, month } = request.query as { year?: string; month?: string };
     if (!year || !month) {

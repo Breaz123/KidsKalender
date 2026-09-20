@@ -1,10 +1,12 @@
-import { format, addDays } from 'date-fns';
+import { format, addDays, parseISO } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { useCalendarMonth } from '../hooks/useCalendar';
+import { useCalendarMonth, useToday } from '../hooks/useCalendar';
 import { DayCard } from '../components/DayCard';
 
 export function TodayPage() {
-  const today = new Date();
+  const { data: todayStr, isLoading: todayLoading } = useToday();
+
+  const today = todayStr ? parseISO(todayStr) : new Date();
   const tomorrow = addDays(today, 1);
   const year = today.getFullYear();
   const month = today.getMonth() + 1;
@@ -17,13 +19,23 @@ export function TodayPage() {
     tomorrowMonth !== month ? tomorrowMonth : month,
   );
 
-  const todayStr = format(today, 'yyyy-MM-dd');
   const tomorrowStr = format(tomorrow, 'yyyy-MM-dd');
 
-  const todayEntry = entries.find((e) => e.date === todayStr)
+  const todayEntry = todayStr && entries.find((e) => e.date === todayStr)
     ?? tomorrowEntries.find((e) => e.date === todayStr);
   const tomorrowEntry = entries.find((e) => e.date === tomorrowStr)
     ?? tomorrowEntries.find((e) => e.date === tomorrowStr);
+
+  if (todayLoading || !todayStr) {
+    return (
+      <div className="px-4 py-6 pb-24">
+        <h1 className="mb-1 text-2xl font-bold">Vandaag</h1>
+        <div className="py-12 text-center text-gray-500" role="status">
+          Laden…
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 py-6 pb-24">
