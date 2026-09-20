@@ -1,4 +1,4 @@
-import { eq, and, gte, lte, desc } from 'drizzle-orm';
+import { eq, and, gte, lte, desc, or } from 'drizzle-orm';
 import { getDb } from '../db/index.js';
 import {
   calendarEntries,
@@ -8,9 +8,9 @@ import {
 import type { CalendarEntryInput } from '@kids-calendar/shared';
 import { entryToJson } from '../lib/utils.js';
 
-export async function getEntryByDate(householdId: string, date: string) {
+export async function getEntryByDate(householdId: string, date: string, userId: string) {
   const db = getDb();
-  const [entry] = await db
+  const entries = await db
     .select({
       id: calendarEntries.id,
       householdId: calendarEntries.householdId,
@@ -25,6 +25,10 @@ export async function getEntryByDate(householdId: string, date: string) {
       pickedUpBy: calendarEntries.pickedUpBy,
       pickedUpByOther: calendarEntries.pickedUpByOther,
       note: calendarEntries.note,
+      isShared: calendarEntries.isShared,
+      ownerId: calendarEntries.ownerId,
+      title: calendarEntries.title,
+      time: calendarEntries.time,
       createdBy: calendarEntries.createdBy,
       updatedBy: calendarEntries.updatedBy,
       createdAt: calendarEntries.createdAt,
@@ -38,15 +42,71 @@ export async function getEntryByDate(householdId: string, date: string) {
       and(
         eq(calendarEntries.householdId, householdId),
         eq(calendarEntries.date, date),
+        or(
+          eq(calendarEntries.isShared, true),
+          eq(calendarEntries.ownerId, userId),
+        ),
+      ),
+    );
+
+  if (entries.length === 0) return null;
+  
+  // Prioritize shared entries over private ones
+  const sharedEntry = entries.find(e => e.isShared);
+  if (sharedEntry) return entryToJson(sharedEntry);
+  
+  // Return user's private entry
+  return entryToJson(entries[0]);
+}
+
+export async function getAllEntriesForDate(householdId: string, date: string, userId: string) {
+  const db = getDb();
+  const entries = await db
+    .select({
+      id: calendarEntries.id,
+      householdId: calendarEntries.householdId,
+      date: calendarEntries.date,
+      daytimeLocation: calendarEntries.daytimeLocation,
+      daytimeLocationOther: calendarEntries.daytimeLocationOther,
+      activity: calendarEntries.activity,
+      activityOther: calendarEntries.activityOther,
+      sleepLocation: calendarEntries.sleepLocation,
+      broughtBy: calendarEntries.broughtBy,
+      broughtByOther: calendarEntries.broughtByOther,
+      pickedUpBy: calendarEntries.pickedUpBy,
+      pickedUpByOther: calendarEntries.pickedUpByOther,
+      note: calendarEntries.note,
+      isShared: calendarEntries.isShared,
+      ownerId: calendarEntries.ownerId,
+      title: calendarEntries.title,
+      time: calendarEntries.time,
+      createdBy: calendarEntries.createdBy,
+      updatedBy: calendarEntries.updatedBy,
+      createdAt: calendarEntries.createdAt,
+      updatedAt: calendarEntries.updatedAt,
+      version: calendarEntries.version,
+      updatedByName: users.name,
+    })
+    .from(calendarEntries)
+    .leftJoin(users, eq(calendarEntries.updatedBy, users.id))
+    .where(
+      and(
+        eq(calendarEntries.householdId, householdId),
+        eq(calendarEntries.date, date),
+        or(
+          eq(calendarEntries.isShared, true),
+          eq(calendarEntries.ownerId, userId),
+        ),
       ),
     )
-    .limit(1);
+    .orderBy(desc(calendarEntries.isShared), calendarEntries.createdAt);
 
-  return entry ? entryToJson(entry) : null;
+  return entries.map(entryToJson);
 }
 
 export async function getEntriesForMonth(
   householdId: string,
+  userId: string,
   year: number,
   month: number,
 ) {
@@ -70,6 +130,10 @@ export async function getEntriesForMonth(
       pickedUpBy: calendarEntries.pickedUpBy,
       pickedUpByOther: calendarEntries.pickedUpByOther,
       note: calendarEntries.note,
+      isShared: calendarEntries.isShared,
+      ownerId: calendarEntries.ownerId,
+      title: calendarEntries.title,
+      time: calendarEntries.time,
       createdBy: calendarEntries.createdBy,
       updatedBy: calendarEntries.updatedBy,
       createdAt: calendarEntries.createdAt,
@@ -84,6 +148,10 @@ export async function getEntriesForMonth(
         eq(calendarEntries.householdId, householdId),
         gte(calendarEntries.date, start),
         lte(calendarEntries.date, end),
+        or(
+          eq(calendarEntries.isShared, true),
+          eq(calendarEntries.ownerId, userId),
+        ),
       ),
     )
     .orderBy(calendarEntries.date);
@@ -91,7 +159,7 @@ export async function getEntriesForMonth(
   return entries.map(entryToJson);
 }
 
-export async function getAllEntries(householdId: string) {
+export async function getAllEntries(householdId: string, userId: string) {
   const db = getDb();
   const entries = await db
     .select({
@@ -108,6 +176,10 @@ export async function getAllEntries(householdId: string) {
       pickedUpBy: calendarEntries.pickedUpBy,
       pickedUpByOther: calendarEntries.pickedUpByOther,
       note: calendarEntries.note,
+      isShared: calendarEntries.isShared,
+      ownerId: calendarEntries.ownerId,
+      title: calendarEntries.title,
+      time: calendarEntries.time,
       createdBy: calendarEntries.createdBy,
       updatedBy: calendarEntries.updatedBy,
       createdAt: calendarEntries.createdAt,
@@ -117,7 +189,15 @@ export async function getAllEntries(householdId: string) {
     })
     .from(calendarEntries)
     .leftJoin(users, eq(calendarEntries.updatedBy, users.id))
-    .where(eq(calendarEntries.householdId, householdId))
+    .where(
+      and(
+        eq(calendarEntries.householdId, householdId),
+        or(
+          eq(calendarEntries.isShared, true),
+          eq(calendarEntries.ownerId, userId),
+        ),
+      ),
+    )
     .orderBy(calendarEntries.date);
 
   return entries.map(entryToJson);
@@ -135,6 +215,9 @@ function normalizeInput(input: CalendarEntryInput) {
     pickedUpBy: input.pickedUpBy ?? null,
     pickedUpByOther: input.pickedUpByOther ?? null,
     note: input.note ?? null,
+    isShared: input.isShared ?? true,
+    title: input.title ?? null,
+    time: input.time ?? null,
   };
 }
 
@@ -146,7 +229,7 @@ export async function upsertEntry(
 ) {
   const db = getDb();
   const normalized = normalizeInput(input);
-  const existing = await getEntryByDate(householdId, date);
+  const existing = await getEntryByDate(householdId, date, userId);
 
   if (existing) {
     if (input.version !== undefined && input.version !== existing.version) {
@@ -187,7 +270,7 @@ export async function upsertEntry(
       return [row];
     });
 
-    return { conflict: false as const, entry: await getEntryByDate(householdId, updated.date as string) };
+    return { conflict: false as const, entry: await getEntryByDate(householdId, updated.date as string, userId) };
   }
 
   const [created] = await db.transaction(async (tx) => {
@@ -197,6 +280,7 @@ export async function upsertEntry(
         householdId,
         date,
         ...normalized,
+        ownerId: normalized.isShared ? null : userId,
         createdBy: userId,
         updatedBy: userId,
         version: 1,
@@ -215,7 +299,7 @@ export async function upsertEntry(
     return [row];
   });
 
-  return { conflict: false as const, entry: await getEntryByDate(householdId, created.date as string) };
+  return { conflict: false as const, entry: await getEntryByDate(householdId, created.date as string, userId) };
 }
 
 export async function deleteEntry(
@@ -224,7 +308,7 @@ export async function deleteEntry(
   userId: string,
 ) {
   const db = getDb();
-  const existing = await getEntryByDate(householdId, date);
+  const existing = await getEntryByDate(householdId, date, userId);
   if (!existing) return null;
 
   await db.transaction(async (tx) => {
@@ -251,7 +335,7 @@ export async function copyEntry(
   targetDate: string,
   userId: string,
 ) {
-  const source = await getEntryByDate(householdId, sourceDate);
+  const source = await getEntryByDate(householdId, sourceDate, userId);
   if (!source) return null;
 
   const {
@@ -261,6 +345,8 @@ export async function copyEntry(
     createdAt: _createdAt,
     updatedAt: _updatedAt,
     updatedByName: _updatedByName,
+    isShared: _isShared,
+    ownerId: _ownerId,
     ...rest
   } = source;
   void _version;
@@ -269,7 +355,9 @@ export async function copyEntry(
   void _createdAt;
   void _updatedAt;
   void _updatedByName;
-  return upsertEntry(householdId, targetDate, userId, rest);
+  void _isShared;
+  void _ownerId;
+  return upsertEntry(householdId, targetDate, userId, { ...rest, isShared: source.isShared });
 }
 
 export async function bulkUpsertEntries(
@@ -286,8 +374,8 @@ export async function bulkUpsertEntries(
   return results;
 }
 
-export async function getEntryHistory(householdId: string, date: string) {
-  const entry = await getEntryByDate(householdId, date);
+export async function getEntryHistory(householdId: string, date: string, userId: string) {
+  const entry = await getEntryByDate(householdId, date, userId);
   if (!entry) return [];
 
   const db = getDb();

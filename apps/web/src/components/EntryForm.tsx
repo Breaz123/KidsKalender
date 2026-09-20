@@ -35,6 +35,9 @@ const emptyForm: CalendarEntryInput = {
   pickedUpBy: null,
   pickedUpByOther: null,
   note: null,
+  isShared: true,
+  title: null,
+  time: null,
 };
 
 export function EntryForm({
@@ -207,7 +210,50 @@ export function EntryForm({
           />
         </div>
 
-        {mode === 'create' && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <label className="mb-2 block text-sm font-medium text-gray-700">
+            Zichtbaarheid
+          </label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => update('isShared', true)}
+              disabled={!isOnline}
+              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                form.isShared
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+              }`}
+            >
+              Gedeeld
+            </button>
+            <button
+              type="button"
+              onClick={() => update('isShared', false)}
+              disabled={!isOnline}
+              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                !form.isShared
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+              }`}
+            >
+              Privé
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-gray-600">
+            {form.isShared ? (
+              <>
+                <span className="font-medium">Gedeeld:</span> Beide ouders kunnen dit zien en bewerken.
+              </>
+            ) : (
+              <>
+                <span className="font-medium">Privé:</span> Alleen jij kunt dit zien. De andere ouder ziet dit niet.
+              </>
+            )}
+          </p>
+        </div>
+
+        {mode === 'create' && form.isShared && (
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -237,97 +283,140 @@ export function EntryForm({
           </div>
         )}
 
-        <ChoiceButtonGroup
-          label="Overdag bij"
-          options={[{ value: null as unknown as DaytimeLocation, label: '—' }, ...daytimeOptions]}
-          value={form.daytimeLocation ?? null}
-          onChange={(v) => update('daytimeLocation', v)}
-          disabled={!isOnline}
-        />
+        {/* Shared entry fields */}
+        {form.isShared && (
+          <>
+            <ChoiceButtonGroup
+              label="Overdag bij"
+              options={[{ value: null as unknown as DaytimeLocation, label: '—' }, ...daytimeOptions]}
+              value={form.daytimeLocation ?? null}
+              onChange={(v) => update('daytimeLocation', v)}
+              disabled={!isOnline}
+            />
 
-        {form.daytimeLocation === 'andere' && (
-          <input
-            type="text"
-            placeholder="Locatie"
-            value={form.daytimeLocationOther ?? ''}
-            onChange={(e) => update('daytimeLocationOther', e.target.value)}
-            disabled={!isOnline}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2"
-            maxLength={100}
-          />
+            {form.daytimeLocation === 'andere' && (
+              <input
+                type="text"
+                placeholder="Locatie"
+                value={form.daytimeLocationOther ?? ''}
+                onChange={(e) => update('daytimeLocationOther', e.target.value)}
+                disabled={!isOnline}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                maxLength={100}
+              />
+            )}
+
+            <div>
+              <ChoiceButtonGroup
+                label="Activiteit (optioneel)"
+                options={[{ value: null as unknown as Activity, label: '—' }, ...activityOptions]}
+                value={form.activity ?? null}
+                onChange={(v) => update('activity', v)}
+                disabled={!isOnline}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Extra bij wie ze zijn — bv. vakantie mét papa (niet in plaats van slapen/overdag).
+              </p>
+            </div>
+
+            {form.activity === 'andere' && (
+              <input
+                type="text"
+                placeholder="Activiteit"
+                value={form.activityOther ?? ''}
+                onChange={(e) => update('activityOther', e.target.value)}
+                disabled={!isOnline}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                maxLength={100}
+              />
+            )}
+
+            <ChoiceButtonGroup
+              label="Slapen bij"
+              options={sleepOptions}
+              value={form.sleepLocation ?? null}
+              onChange={(v) => update('sleepLocation', v)}
+              disabled={!isOnline}
+            />
+
+            <ChoiceButtonGroup
+              label="Brengen door"
+              options={personOptions}
+              value={form.broughtBy ?? null}
+              onChange={(v) => update('broughtBy', v)}
+              disabled={!isOnline}
+            />
+
+            {form.broughtBy === 'andere' && (
+              <input
+                type="text"
+                placeholder="Naam"
+                value={form.broughtByOther ?? ''}
+                onChange={(e) => update('broughtByOther', e.target.value)}
+                disabled={!isOnline}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                maxLength={100}
+              />
+            )}
+
+            <ChoiceButtonGroup
+              label="Ophalen door"
+              options={personOptions}
+              value={form.pickedUpBy ?? null}
+              onChange={(v) => update('pickedUpBy', v)}
+              disabled={!isOnline}
+            />
+
+            {form.pickedUpBy === 'andere' && (
+              <input
+                type="text"
+                placeholder="Naam"
+                value={form.pickedUpByOther ?? ''}
+                onChange={(e) => update('pickedUpByOther', e.target.value)}
+                disabled={!isOnline}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                maxLength={100}
+              />
+            )}
+          </>
         )}
 
-        <div>
-          <ChoiceButtonGroup
-            label="Activiteit (optioneel)"
-            options={[{ value: null as unknown as Activity, label: '—' }, ...activityOptions]}
-            value={form.activity ?? null}
-            onChange={(v) => update('activity', v)}
-            disabled={!isOnline}
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            Extra bij wie ze zijn — bv. vakantie mét papa (niet in plaats van slapen/overdag).
-          </p>
-        </div>
+        {/* Private entry fields */}
+        {!form.isShared && (
+          <>
+            <div>
+              <label htmlFor="entry-title" className="mb-1 block text-sm font-medium text-gray-700">
+                Titel <span className="text-red-600">*</span>
+              </label>
+              <input
+                id="entry-title"
+                type="text"
+                value={form.title ?? ''}
+                onChange={(e) => update('title', e.target.value || null)}
+                disabled={!isOnline}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                maxLength={200}
+                placeholder="Bijv. Tandarts afspraak"
+                required
+              />
+            </div>
 
-        {form.activity === 'andere' && (
-          <input
-            type="text"
-            placeholder="Activiteit"
-            value={form.activityOther ?? ''}
-            onChange={(e) => update('activityOther', e.target.value)}
-            disabled={!isOnline}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2"
-            maxLength={100}
-          />
-        )}
-
-        <ChoiceButtonGroup
-          label="Slapen bij"
-          options={sleepOptions}
-          value={form.sleepLocation ?? null}
-          onChange={(v) => update('sleepLocation', v)}
-          disabled={!isOnline}
-        />
-
-        <ChoiceButtonGroup
-          label="Brengen door"
-          options={personOptions}
-          value={form.broughtBy ?? null}
-          onChange={(v) => update('broughtBy', v)}
-          disabled={!isOnline}
-        />
-
-        {form.broughtBy === 'andere' && (
-          <input
-            type="text"
-            placeholder="Naam"
-            value={form.broughtByOther ?? ''}
-            onChange={(e) => update('broughtByOther', e.target.value)}
-            disabled={!isOnline}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2"
-            maxLength={100}
-          />
-        )}
-
-        <ChoiceButtonGroup
-          label="Ophalen door"
-          options={personOptions}
-          value={form.pickedUpBy ?? null}
-          onChange={(v) => update('pickedUpBy', v)}
-          disabled={!isOnline}
-        />
-
-        {form.pickedUpBy === 'andere' && (
-          <input
-            type="text"
-            placeholder="Naam"
-            value={form.pickedUpByOther ?? ''}
-            onChange={(e) => update('pickedUpByOther', e.target.value)}
-            disabled={!isOnline}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2"
-            maxLength={100}
-          />
+            <div>
+              <label htmlFor="entry-time" className="mb-1 block text-sm font-medium text-gray-700">
+                Tijd (optioneel)
+              </label>
+              <input
+                id="entry-time"
+                type="text"
+                value={form.time ?? ''}
+                onChange={(e) => update('time', e.target.value || null)}
+                disabled={!isOnline}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                maxLength={50}
+                placeholder="Bijv. 14:00 of 14:00-15:30"
+              />
+            </div>
+          </>
         )}
 
         <div>
