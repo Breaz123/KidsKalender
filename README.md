@@ -74,6 +74,8 @@ docker compose up -d --build
 
 Caddy regelt automatisch HTTPS zodra `DOMAIN` naar uw server wijst.
 
+Split hosting (Vercel-frontend + VPS-API) vereist `COOKIE_SAMESITE=none`, `COOKIE_SECURE=true` en `CORS_ORIGIN` gelijk aan de Vercel-origin. Zie [docs/SPLIT_HOSTING.md](docs/SPLIT_HOSTING.md).
+
 ## Omgevingsvariabelen
 
 | Variabele | Beschrijving | Voorbeeld |
@@ -85,7 +87,8 @@ Caddy regelt automatisch HTTPS zodra `DOMAIN` naar uw server wijst.
 | `SESSION_SECRET` | Geheim voor sessiecookies (min. 32 tekens) | `change_me...` |
 | `SESSION_DURATION_HOURS` | Sessieduur in uren | `168` |
 | `COOKIE_SECURE` | Secure-cookie (`true` in productie) | `false` |
-| `CORS_ORIGIN` | Toegestane frontend-origin | `http://localhost:5173` |
+| `COOKIE_SAMESITE` | Cookie SameSite: `lax` (default), `strict`, of `none` | `lax` |
+| `CORS_ORIGIN` | Toegestane frontend-origin (exact) | `http://localhost:5173` |
 | `DOMAIN` | Productiedomein voor Caddy | `kalender.example.com` |
 | `ACME_EMAIL` | E-mail voor Let's Encrypt | `admin@example.com` |
 | `VITE_API_URL` | API-URL voor frontend build | `http://localhost:3001` |

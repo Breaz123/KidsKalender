@@ -70,7 +70,7 @@ export async function authRoutes(app: FastifyInstance) {
     if (token) {
       await destroySession(token);
     }
-    reply.clearCookie(SESSION_COOKIE, { path: '/' });
+    reply.clearCookie(SESSION_COOKIE, getCookieOptions());
     return { success: true };
   });
 
@@ -209,7 +209,7 @@ export async function settingsRoutes(app: FastifyInstance) {
       );
     }
 
-    reply.clearCookie(SESSION_COOKIE, { path: '/' });
+    reply.clearCookie(SESSION_COOKIE, getCookieOptions());
     return { success: true, message: 'Wachtwoord gewijzigd. Log opnieuw in.' };
   });
 }
