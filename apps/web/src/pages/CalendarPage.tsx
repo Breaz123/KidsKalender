@@ -7,13 +7,12 @@ import {
   getDay,
   addMonths,
   subMonths,
-  isToday,
   parseISO,
 } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useCalendarMonth, useUpsertEntry, useBulkEntries } from '../hooks/useCalendar';
+import { useCalendarMonth, useUpsertEntry, useBulkEntries, useToday } from '../hooks/useCalendar';
 import { DayCell } from '../components/DayCell';
 import { EntryForm } from '../components/EntryForm';
 import type { CalendarEntryInput } from '@kids-calendar/shared';
@@ -26,6 +25,7 @@ export function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showForm, setShowForm] = useState(false);
   const [formDate, setFormDate] = useState<string>();
+  const { data: todayStr } = useToday();
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
@@ -78,7 +78,14 @@ export function CalendarPage() {
             </h1>
             <button
               type="button"
-              onClick={() => setCurrentDate(new Date())}
+              onClick={() => {
+                if (todayStr) {
+                  const today = parseISO(todayStr);
+                  setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1));
+                } else {
+                  setCurrentDate(new Date());
+                }
+              }}
               className="text-sm text-blue-600 hover:underline"
             >
               Naar vandaag
@@ -118,7 +125,7 @@ export function CalendarPage() {
             className="rounded-lg border border-gray-300 px-2 py-1 text-sm"
             aria-label="Jaar kiezen"
           >
-            {Array.from({ length: 5 }, (_, i) => year - 2 + i).map((y) => (
+            {Array.from({ length: 11 }, (_, i) => year - 5 + i).map((y) => (
               <option key={y} value={y}>
                 {y}
               </option>
@@ -156,12 +163,13 @@ export function CalendarPage() {
               ))}
               {days.map((day) => {
                 const dateStr = format(day, 'yyyy-MM-dd');
+                const isTodayDate = todayStr === dateStr;
                 return (
                   <DayCell
                     key={dateStr}
                     day={day.getDate()}
                     entry={entryMap.get(dateStr)}
-                    isToday={isToday(day)}
+                    isToday={isTodayDate}
                     onClick={() => navigate(`/dag/${dateStr}`)}
                   />
                 );

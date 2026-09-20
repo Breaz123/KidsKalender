@@ -58,6 +58,8 @@ export const api = {
 
   me: () => request<{ user: AuthUser }>('/api/auth/me'),
 
+  getToday: () => request<{ today: string }>('/api/calendar/today'),
+
   getCalendar: (year: number, month: number) =>
     request<{ entries: CalendarEntry[] }>(
       `/api/calendar?year=${year}&month=${month}`,

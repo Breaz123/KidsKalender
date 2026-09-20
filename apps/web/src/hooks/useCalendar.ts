@@ -3,6 +3,28 @@ import { api } from '../lib/api';
 import { cacheCalendarMonth, getCachedCalendarMonth } from '../lib/offline';
 import type { CalendarEntryInput } from '@kids-calendar/shared';
 
+export function useToday() {
+  return useQuery({
+    queryKey: ['today'],
+    queryFn: async () => {
+      try {
+        const data = await api.getToday();
+        return data.today;
+      } catch {
+        const fallback = new Date().toLocaleString('en-CA', {
+          timeZone: 'Europe/Brussels',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).slice(0, 10);
+        return fallback;
+      }
+    },
+    staleTime: 60000,
+    refetchInterval: 60000,
+  });
+}
+
 export function useCalendarMonth(year: number, month: number) {
   return useQuery({
     queryKey: ['calendar', year, month],

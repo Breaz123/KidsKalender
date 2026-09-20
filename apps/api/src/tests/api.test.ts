@@ -125,6 +125,18 @@ describe('Auth', () => {
 });
 
 describe('Calendar', () => {
+  it('vandaag-endpoint geeft Europe/Brussels datum', async () => {
+    if (!requireDb()) return;
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/calendar/today',
+      cookies: { session: sessionCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    const { today } = res.json();
+    expect(today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
   it('kalenderitem aanmaken', async () => {
     if (!requireDb()) return;
     const res = await app.inject({
