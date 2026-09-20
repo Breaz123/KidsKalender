@@ -62,7 +62,7 @@ export function DayCell({
       type="button"
       onClick={onClick}
       className={cn(
-        'flex min-h-[88px] w-full flex-col rounded-lg border p-1.5 text-left transition-colors sm:min-h-[100px] sm:p-2',
+        'flex min-h-[88px] w-full flex-col rounded-lg border p-1.5 text-left transition-colors sm:min-h-[100px] sm:p-2 relative',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1',
         !isCurrentMonth && 'opacity-40',
         isToday && 'ring-2 ring-blue-600 ring-offset-1',
@@ -75,7 +75,14 @@ export function DayCell({
       aria-label={ariaParts.join(', ')}
       data-diagonal={cellBg.isDiagonal ? 'true' : 'false'}
     >
-      <span className="mb-1 text-sm font-bold leading-none">{day}</span>
+      <div className="flex items-start justify-between gap-1">
+        <span className="mb-1 text-sm font-bold leading-none">{day}</span>
+        {entry && !entry.isShared && (
+          <svg className="h-3 w-3 shrink-0 text-purple-700" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
+          </svg>
+        )}
+      </div>
 
       {entry?.daytimeLocation && (
         <div className="mb-0.5 flex items-start gap-0.5 text-[10px] leading-tight sm:text-xs">

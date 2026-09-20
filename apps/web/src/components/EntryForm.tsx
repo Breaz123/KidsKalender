@@ -35,6 +35,7 @@ const emptyForm: CalendarEntryInput = {
   pickedUpBy: null,
   pickedUpByOther: null,
   note: null,
+  isShared: true,
 };
 
 export function EntryForm({
@@ -207,7 +208,50 @@ export function EntryForm({
           />
         </div>
 
-        {mode === 'create' && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <label className="mb-2 block text-sm font-medium text-gray-700">
+            Zichtbaarheid
+          </label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => update('isShared', true)}
+              disabled={!isOnline}
+              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                form.isShared
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+              }`}
+            >
+              Gedeeld
+            </button>
+            <button
+              type="button"
+              onClick={() => update('isShared', false)}
+              disabled={!isOnline}
+              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                !form.isShared
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+              }`}
+            >
+              Privé
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-gray-600">
+            {form.isShared ? (
+              <>
+                <span className="font-medium">Gedeeld:</span> Beide ouders kunnen dit zien en bewerken.
+              </>
+            ) : (
+              <>
+                <span className="font-medium">Privé:</span> Alleen jij kunt dit zien. De andere ouder ziet dit niet.
+              </>
+            )}
+          </p>
+        </div>
+
+        {mode === 'create' && form.isShared && (
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
