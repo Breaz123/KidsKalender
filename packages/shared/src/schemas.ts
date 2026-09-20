@@ -117,6 +117,8 @@ export const importJsonSchema = z.object({
       pickedUpByOther: z.string().nullable().optional(),
       note: z.string().nullable().optional(),
       isShared: z.boolean().optional().default(true),
+      title: z.string().max(200).nullable().optional(),
+      time: z.string().max(50).nullable().optional(),
     }),
   ),
 });
