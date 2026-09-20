@@ -147,6 +147,7 @@ describe('Calendar', () => {
         daytimeLocation: 'oma',
         sleepLocation: 'mama',
         pickedUpBy: 'trixie',
+        isShared: true,
       },
     });
     expect(res.statusCode).toBe(200);
@@ -164,6 +165,7 @@ describe('Calendar', () => {
         daytimeLocation: 'oma',
         sleepLocation: 'papa',
         pickedUpBy: 'trixie',
+        isShared: true,
         version: 1,
       },
     });
@@ -181,6 +183,7 @@ describe('Calendar', () => {
       payload: {
         daytimeLocation: 'oma',
         sleepLocation: 'mama',
+        isShared: true,
         version: 1,
       },
     });
@@ -196,7 +199,7 @@ describe('Calendar', () => {
       payload: {
         startDate: '2026-08-15',
         endDate: '2026-08-17',
-        entry: { activity: 'vakantie', daytimeLocation: 'papa', sleepLocation: 'papa' },
+        entry: { activity: 'vakantie', daytimeLocation: 'papa', sleepLocation: 'papa', isShared: true },
       },
     });
     expect(res.statusCode).toBe(200);

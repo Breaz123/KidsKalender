@@ -24,6 +24,7 @@ const calendarEntryBaseSchema = z.object({
   pickedUpByOther: z.string().max(100).nullable().optional(),
   note: z.string().max(500).nullable().optional(),
   version: z.number().int().positive().optional(),
+  isShared: z.boolean().optional().default(true),
 });
 
 export const calendarEntryInputSchema = calendarEntryBaseSchema.superRefine(

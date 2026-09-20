@@ -37,6 +37,8 @@ export interface CalendarEntry {
   pickedUpBy: PersonOption | null;
   pickedUpByOther: string | null;
   note: string | null;
+  isShared: boolean;
+  ownerId?: string;
   createdBy: string;
   updatedBy: string;
   createdAt: string;

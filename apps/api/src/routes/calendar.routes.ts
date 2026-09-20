@@ -48,7 +48,7 @@ export async function calendarRoutes(app: FastifyInstance) {
       return sendError(reply, 400, 'VALIDATION_ERROR', 'Ongeldige maand of jaar.');
     }
 
-    const entries = await getEntriesForMonth(request.user!.householdId, y, m);
+    const entries = await getEntriesForMonth(request.user!.householdId, request.user!.id, y, m);
     return { entries };
   });
 
@@ -58,7 +58,7 @@ export async function calendarRoutes(app: FastifyInstance) {
       return sendError(reply, 400, 'VALIDATION_ERROR', 'Ongeldige datum.');
     }
 
-    const entry = await getEntryByDate(request.user!.householdId, date);
+    const entry = await getEntryByDate(request.user!.householdId, date, request.user!.id);
     if (!entry) {
       return sendError(reply, 404, 'NOT_FOUND', 'Geen regeling gevonden voor deze dag.');
     }
@@ -181,7 +181,7 @@ export async function calendarRoutes(app: FastifyInstance) {
       return sendError(reply, 400, 'VALIDATION_ERROR', 'Ongeldige datum.');
     }
 
-    const history = await getEntryHistory(request.user!.householdId, date);
+    const history = await getEntryHistory(request.user!.householdId, date, request.user!.id);
     return { history };
   });
 }
@@ -190,7 +190,7 @@ export async function exportRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAuth);
 
   app.get('/csv', async (request, reply) => {
-    const entries = await getAllEntries(request.user!.householdId);
+    const entries = await getAllEntries(request.user!.householdId, request.user!.id);
     const header = 'datum,overdag,activiteit,slapen,brengen,ophalen,opmerking';
     const rows = entries.map((e) =>
       [
@@ -213,7 +213,7 @@ export async function exportRoutes(app: FastifyInstance) {
   });
 
   app.get('/json', async (request, reply) => {
-    const entries = await getAllEntries(request.user!.householdId);
+    const entries = await getAllEntries(request.user!.householdId, request.user!.id);
     reply.header('Content-Type', 'application/json');
     reply.header('Content-Disposition', 'attachment; filename="kalender-export.json"');
     return { exportedAt: new Date().toISOString(), entries };
@@ -241,7 +241,7 @@ export async function importRoutes(app: FastifyInstance) {
     let skipped = 0;
 
     for (const item of parsed.data.entries) {
-      const existing = await getEntryByDate(request.user!.householdId, item.date);
+      const existing = await getEntryByDate(request.user!.householdId, item.date, request.user!.id);
       const { date, ...input } = item;
       void date;
       const result = await upsertEntry(
