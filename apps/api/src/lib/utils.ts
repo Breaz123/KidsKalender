@@ -16,6 +16,8 @@ export function entryToJson(entry: {
   note: string | null;
   isShared: boolean;
   ownerId: string | null;
+  title: string | null;
+  time: string | null;
   createdBy: string;
   updatedBy: string;
   createdAt: Date;
@@ -39,6 +41,8 @@ export function entryToJson(entry: {
     note: entry.note,
     isShared: entry.isShared,
     ownerId: entry.ownerId ?? undefined,
+    title: entry.title ?? undefined,
+    time: entry.time ?? undefined,
     createdBy: entry.createdBy,
     updatedBy: entry.updatedBy,
     createdAt: entry.createdAt.toISOString(),

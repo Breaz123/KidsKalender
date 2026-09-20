@@ -79,6 +79,8 @@ export const calendarEntries = pgTable(
     note: text('note'),
     isShared: boolean('is_shared').notNull().default(true),
     ownerId: uuid('owner_id').references(() => users.id),
+    title: varchar('title', { length: 200 }),
+    time: varchar('time', { length: 50 }),
     createdBy: uuid('created_by')
       .notNull()
       .references(() => users.id),
@@ -93,9 +95,6 @@ export const calendarEntries = pgTable(
     uniqueIndex('calendar_entries_household_date_shared_idx')
       .on(table.householdId, table.date)
       .where(sql`${table.isShared} = true`),
-    uniqueIndex('calendar_entries_household_date_user_idx')
-      .on(table.householdId, table.date, table.ownerId)
-      .where(sql`${table.isShared} = false`),
   ],
 );
 

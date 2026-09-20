@@ -29,6 +29,13 @@
       "when": 1737403200000,
       "tag": "0003_private_agenda",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1737406800000,
+      "tag": "0004_private_entry_fields",
+      "breakpoints": true
     }
   ]
 }

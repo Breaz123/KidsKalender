@@ -39,6 +39,8 @@ export interface CalendarEntry {
   note: string | null;
   isShared: boolean;
   ownerId?: string;
+  title?: string | null;
+  time?: string | null;
   createdBy: string;
   updatedBy: string;
   createdAt: string;

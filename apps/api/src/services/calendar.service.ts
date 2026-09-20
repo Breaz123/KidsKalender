@@ -27,6 +27,8 @@ export async function getEntryByDate(householdId: string, date: string, userId: 
       note: calendarEntries.note,
       isShared: calendarEntries.isShared,
       ownerId: calendarEntries.ownerId,
+      title: calendarEntries.title,
+      time: calendarEntries.time,
       createdBy: calendarEntries.createdBy,
       updatedBy: calendarEntries.updatedBy,
       createdAt: calendarEntries.createdAt,
@@ -57,6 +59,51 @@ export async function getEntryByDate(householdId: string, date: string, userId: 
   return entryToJson(entries[0]);
 }
 
+export async function getAllEntriesForDate(householdId: string, date: string, userId: string) {
+  const db = getDb();
+  const entries = await db
+    .select({
+      id: calendarEntries.id,
+      householdId: calendarEntries.householdId,
+      date: calendarEntries.date,
+      daytimeLocation: calendarEntries.daytimeLocation,
+      daytimeLocationOther: calendarEntries.daytimeLocationOther,
+      activity: calendarEntries.activity,
+      activityOther: calendarEntries.activityOther,
+      sleepLocation: calendarEntries.sleepLocation,
+      broughtBy: calendarEntries.broughtBy,
+      broughtByOther: calendarEntries.broughtByOther,
+      pickedUpBy: calendarEntries.pickedUpBy,
+      pickedUpByOther: calendarEntries.pickedUpByOther,
+      note: calendarEntries.note,
+      isShared: calendarEntries.isShared,
+      ownerId: calendarEntries.ownerId,
+      title: calendarEntries.title,
+      time: calendarEntries.time,
+      createdBy: calendarEntries.createdBy,
+      updatedBy: calendarEntries.updatedBy,
+      createdAt: calendarEntries.createdAt,
+      updatedAt: calendarEntries.updatedAt,
+      version: calendarEntries.version,
+      updatedByName: users.name,
+    })
+    .from(calendarEntries)
+    .leftJoin(users, eq(calendarEntries.updatedBy, users.id))
+    .where(
+      and(
+        eq(calendarEntries.householdId, householdId),
+        eq(calendarEntries.date, date),
+        or(
+          eq(calendarEntries.isShared, true),
+          eq(calendarEntries.ownerId, userId),
+        ),
+      ),
+    )
+    .orderBy(desc(calendarEntries.isShared), calendarEntries.createdAt);
+
+  return entries.map(entryToJson);
+}
+
 export async function getEntriesForMonth(
   householdId: string,
   userId: string,
@@ -85,6 +132,8 @@ export async function getEntriesForMonth(
       note: calendarEntries.note,
       isShared: calendarEntries.isShared,
       ownerId: calendarEntries.ownerId,
+      title: calendarEntries.title,
+      time: calendarEntries.time,
       createdBy: calendarEntries.createdBy,
       updatedBy: calendarEntries.updatedBy,
       createdAt: calendarEntries.createdAt,
@@ -129,6 +178,8 @@ export async function getAllEntries(householdId: string, userId: string) {
       note: calendarEntries.note,
       isShared: calendarEntries.isShared,
       ownerId: calendarEntries.ownerId,
+      title: calendarEntries.title,
+      time: calendarEntries.time,
       createdBy: calendarEntries.createdBy,
       updatedBy: calendarEntries.updatedBy,
       createdAt: calendarEntries.createdAt,
@@ -165,6 +216,8 @@ function normalizeInput(input: CalendarEntryInput) {
     pickedUpByOther: input.pickedUpByOther ?? null,
     note: input.note ?? null,
     isShared: input.isShared ?? true,
+    title: input.title ?? null,
+    time: input.time ?? null,
   };
 }
 
