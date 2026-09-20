@@ -21,8 +21,9 @@ export function TodayPage() {
 
   const tomorrowStr = format(tomorrow, 'yyyy-MM-dd');
 
-  const todayEntry = todayStr && entries.find((e) => e.date === todayStr)
-    ?? tomorrowEntries.find((e) => e.date === todayStr);
+  const todayEntry = todayStr 
+    ? (entries.find((e) => e.date === todayStr) ?? tomorrowEntries.find((e) => e.date === todayStr))
+    : undefined;
   const tomorrowEntry = entries.find((e) => e.date === tomorrowStr)
     ?? tomorrowEntries.find((e) => e.date === tomorrowStr);
 
