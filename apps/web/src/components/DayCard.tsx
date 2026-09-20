@@ -5,6 +5,7 @@ import {
   getSleepLabelFromSettings,
   getSleepColorFromSettings,
   getDaytimeCareColorFromSettings,
+  getDisplayIconFromSettings,
   EMPTY_DAY_COLOR,
   type CalendarEntry,
   type SleepLocation,
@@ -20,8 +21,51 @@ interface DayCardProps {
   size?: 'large' | 'small';
 }
 
+function PrivateBadge() {
+  return (
+    <div className="absolute top-2 right-2 z-10">
+      <div className="flex items-center gap-1 rounded-full bg-purple-600 px-2 py-1 text-xs font-medium text-white shadow-sm">
+        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+        Privé
+      </div>
+    </div>
+  );
+}
+
 export function DayCard({ entry, date, size = 'large' }: DayCardProps) {
   const { displaySettings } = useDisplaySettings();
+  const isLarge = size === 'large';
+
+  if (entry && !entry.isShared) {
+    return (
+      <article className="relative overflow-hidden rounded-xl border-2 border-purple-300 bg-purple-50 text-purple-950">
+        <PrivateBadge />
+        <div className={isLarge ? 'p-5 pr-20' : 'p-3 pr-16'}>
+          <header className={isLarge ? 'mb-3' : 'mb-2'}>
+            <p className={`font-semibold capitalize ${isLarge ? 'text-lg' : 'text-sm'}`}>
+              {format(parseISO(date), 'EEEE d MMMM', { locale: nl })}
+            </p>
+          </header>
+          <h3 className={`font-bold ${isLarge ? 'text-xl' : 'text-base'}`}>
+            {entry.title || 'Privé afspraak'}
+          </h3>
+          {entry.time && (
+            <p className={`mt-1 font-medium text-purple-800 ${isLarge ? 'text-base' : 'text-sm'}`}>
+              {entry.time}
+            </p>
+          )}
+          {entry.note && (
+            <p className={`mt-3 text-sm italic opacity-80 ${isLarge ? '' : 'mt-2'}`}>
+              {entry.note}
+            </p>
+          )}
+        </div>
+      </article>
+    );
+  }
+
   const sleepColor = getSleepColorFromSettings(
     entry?.sleepLocation as SleepLocation | undefined,
     displaySettings,
@@ -30,27 +74,16 @@ export function DayCard({ entry, date, size = 'large' }: DayCardProps) {
     entry?.daytimeLocation,
     displaySettings,
   );
-  const isLarge = size === 'large';
 
   return (
     <article
-      className="overflow-hidden rounded-xl border-2 relative"
+      className="relative overflow-hidden rounded-xl border-2"
       style={{
         backgroundColor: sleepColor.bg,
         borderColor: sleepColor.border,
         color: sleepColor.text,
       }}
     >
-      {entry && !entry.isShared && (
-        <div className="absolute top-2 right-2 z-10">
-          <div className="flex items-center gap-1 rounded-full bg-purple-600 px-2 py-1 text-xs font-medium text-white shadow-sm">
-            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-            Privé
-          </div>
-        </div>
-      )}
       {entry?.daytimeLocation && (
         <div
           className={`flex items-start gap-2 border-b px-4 ${isLarge ? 'py-3' : 'py-2'}`}
@@ -61,7 +94,10 @@ export function DayCard({ entry, date, size = 'large' }: DayCardProps) {
           }}
         >
           <DisplayIcon
-            name={displaySettings.daytime[entry.daytimeLocation].icon}
+            name={getDisplayIconFromSettings(
+              displaySettings.daytime[entry.daytimeLocation],
+              'sun',
+            )}
             className="mt-0.5 h-5 w-5 shrink-0 opacity-80"
           />
           <div>
@@ -83,7 +119,10 @@ export function DayCard({ entry, date, size = 'large' }: DayCardProps) {
           className={`flex items-start gap-2 border-b border-black/10 bg-white/50 px-4 ${isLarge ? 'py-3' : 'py-2'}`}
         >
           <DisplayIcon
-            name={displaySettings.activities[entry.activity].icon}
+            name={getDisplayIconFromSettings(
+              displaySettings.activities[entry.activity],
+              'star',
+            )}
             className="mt-0.5 h-5 w-5 shrink-0 opacity-80"
           />
           <div>
@@ -101,7 +140,7 @@ export function DayCard({ entry, date, size = 'large' }: DayCardProps) {
 
       <div className={isLarge ? 'p-5' : 'p-3'}>
         <header className={isLarge ? 'mb-4' : 'mb-2'}>
-          <p className={`font-semibold ${isLarge ? 'text-lg' : 'text-sm'}`}>
+          <p className={`font-semibold capitalize ${isLarge ? 'text-lg' : 'text-sm'}`}>
             {format(parseISO(date), 'EEEE d MMMM', { locale: nl })}
           </p>
         </header>
@@ -148,7 +187,10 @@ export function DayCard({ entry, date, size = 'large' }: DayCardProps) {
           <div className={`${isLarge ? 'mt-2 rounded-lg bg-white/40 p-3' : 'mt-2'}`}>
             <div className="flex items-start gap-2">
               <DisplayIcon
-                name={displaySettings.sleep[entry.sleepLocation].icon}
+                name={getDisplayIconFromSettings(
+                  displaySettings.sleep[entry.sleepLocation],
+                  'moon',
+                )}
                 className={`shrink-0 ${isLarge ? 'h-6 w-6' : 'h-5 w-5'}`}
               />
               <div>
@@ -162,7 +204,7 @@ export function DayCard({ entry, date, size = 'large' }: DayCardProps) {
                     displaySettings,
                   ).toLowerCase()}
                 </p>
-                {isLarge && (
+                {isLarge && displaySettings.sleep[entry.sleepLocation]?.description && (
                   <p className="mt-1 text-sm opacity-90">
                     {displaySettings.sleep[entry.sleepLocation].description}
                   </p>

@@ -27,6 +27,7 @@ const calendarEntryBaseSchema = z.object({
   isShared: z.boolean().optional().default(true),
   title: z.string().max(200).nullable().optional(),
   time: z.string().max(50).nullable().optional(),
+  id: z.string().uuid().optional(),
 });
 
 export const calendarEntryInputSchema = calendarEntryBaseSchema.superRefine(

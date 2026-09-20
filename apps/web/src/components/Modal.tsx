@@ -26,6 +26,10 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
     <dialog
       ref={dialogRef}
       onClose={onClose}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
       className={cn(
         'fixed inset-0 z-50 m-0 h-full max-h-full w-full max-w-full bg-transparent p-0 backdrop:bg-black/50',
         'open:flex open:items-end open:justify-center sm:open:items-center',

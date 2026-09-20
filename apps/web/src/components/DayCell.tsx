@@ -1,148 +1,183 @@
+import { forwardRef } from 'react';
 import {
   getActivityLabelFromSettings,
   getDaytimeLabelFromSettings,
   getPersonLabelFromSettings,
   getSleepLabelFromSettings,
   getDayCellBackgroundFromSettings,
+  getDisplayIconFromSettings,
   type CalendarEntry,
 } from '@kids-calendar/shared';
+import { format } from 'date-fns';
+import { nl } from 'date-fns/locale';
 import { DisplayIcon } from '../lib/icons';
 import { cn } from '../lib/cn';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
+import { splitDayEntries } from '../lib/entries';
 
 interface DayCellProps {
   day: number;
+  date?: Date;
+  entries?: CalendarEntry[];
+  /** Single-entry fallback for tests; prefer `entries` so layers are not overwritten. */
   entry?: CalendarEntry;
   isToday?: boolean;
   isCurrentMonth?: boolean;
+  tabIndex?: number;
   onClick?: () => void;
 }
 
-export function DayCell({
+export const DayCell = forwardRef<HTMLButtonElement, DayCellProps>(function DayCell({
   day,
+  date,
+  entries,
   entry,
   isToday,
   isCurrentMonth = true,
+  tabIndex,
   onClick,
-}: DayCellProps) {
+}, ref) {
   const { displaySettings } = useDisplaySettings();
-  const cellBg = getDayCellBackgroundFromSettings(entry, displaySettings);
+  const { shared, privates } = splitDayEntries(entries ?? (entry ? [entry] : []));
+  // Own private layers only — API never returns another parent's private.
+  const ownPrivates = privates;
+  const hasOwnPrivate = ownPrivates.length > 0;
+  const cellBg = getDayCellBackgroundFromSettings(shared ?? undefined, displaySettings);
 
-  const daytimeIcon = entry?.daytimeLocation
-    ? displaySettings.daytime[entry.daytimeLocation].icon
+  const daytimeIcon = shared?.daytimeLocation
+    ? getDisplayIconFromSettings(displaySettings.daytime[shared.daytimeLocation], 'sun')
     : 'sun';
-  const activityIcon = entry?.activity
-    ? displaySettings.activities[entry.activity].icon
+  const activityIcon = shared?.activity
+    ? getDisplayIconFromSettings(displaySettings.activities[shared.activity], 'star')
     : 'star';
-  const sleepIcon = entry?.sleepLocation
-    ? displaySettings.sleep[entry.sleepLocation].icon
+  const sleepIcon = shared?.sleepLocation
+    ? getDisplayIconFromSettings(displaySettings.sleep[shared.sleepLocation], 'moon')
     : 'moon';
-  const pickupIcon = 'car' as const;
-  const bringIcon = 'car' as const;
 
-  const ariaParts = [`Dag ${day}`];
-  if (entry?.daytimeLocation) {
+  const ariaParts = [
+    date
+      ? format(date, 'd MMMM', { locale: nl })
+      : `Dag ${day}`,
+  ];
+  if (shared?.daytimeLocation) {
     ariaParts.push(
-      `overdag ${getDaytimeLabelFromSettings(entry.daytimeLocation, entry.daytimeLocationOther, displaySettings)}`,
+      `overdag ${getDaytimeLabelFromSettings(shared.daytimeLocation, shared.daytimeLocationOther, displaySettings)}`,
     );
   }
-  if (entry?.activity) {
+  if (shared?.activity) {
     ariaParts.push(
-      `activiteit ${getActivityLabelFromSettings(entry.activity, entry.activityOther, displaySettings)}`,
+      `activiteit ${getActivityLabelFromSettings(shared.activity, shared.activityOther, displaySettings)}`,
     );
   }
-  if (entry?.sleepLocation) {
+  if (shared?.sleepLocation) {
     ariaParts.push(
-      `slapen bij ${getSleepLabelFromSettings(entry.sleepLocation, displaySettings)}`,
+      `slapen bij ${getSleepLabelFromSettings(shared.sleepLocation, displaySettings)}`,
     );
   }
+  if (!shared) {
+    ariaParts.push('geen kinderregeling');
+  }
+  if (hasOwnPrivate) {
+    ariaParts.push(
+      ownPrivates.length === 1 ? '1 privé afspraak' : `${ownPrivates.length} privé afspraken`,
+    );
+  }
+
+  const onlyOwnPrivate = !shared && hasOwnPrivate;
 
   return (
     <button
+      ref={ref}
       type="button"
       onClick={onClick}
+      tabIndex={tabIndex}
       className={cn(
         'flex min-h-[88px] w-full flex-col rounded-lg border p-1.5 text-left transition-colors sm:min-h-[100px] sm:p-2 relative',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1',
         !isCurrentMonth && 'opacity-40',
         isToday && 'ring-2 ring-blue-600 ring-offset-1',
-        entry && !entry.isShared && 'border-dashed border-2 border-purple-400',
+        onlyOwnPrivate && 'border-dashed border-2 border-purple-400',
       )}
       style={{
-        background: entry?.isShared ? cellBg.background : 'white',
-        borderColor: entry?.isShared ? cellBg.borderColor : undefined,
-        color: entry?.isShared ? cellBg.color : '#6b7280',
+        background: shared ? cellBg.background : 'white',
+        borderColor: shared ? cellBg.borderColor : onlyOwnPrivate ? undefined : cellBg.borderColor,
+        color: shared ? cellBg.color : '#6b7280',
       }}
       aria-label={ariaParts.join(', ')}
-      data-diagonal={cellBg.isDiagonal ? 'true' : 'false'}
+      aria-current={isToday ? 'date' : undefined}
+      data-diagonal={shared ? (cellBg.isDiagonal ? 'true' : 'false') : 'false'}
     >
       <div className="flex items-start justify-between gap-1">
         <span className="mb-1 text-sm font-bold leading-none">{day}</span>
-        {entry && !entry.isShared && (
-          <svg className="h-3 w-3 shrink-0 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-          </svg>
+        {hasOwnPrivate && (
+          <span className="flex items-center gap-0.5" aria-hidden>
+            <svg className="h-3 w-3 shrink-0 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+            </svg>
+            {ownPrivates.length > 1 && (
+              <span className="text-[10px] font-semibold text-purple-700">{ownPrivates.length}</span>
+            )}
+          </span>
         )}
       </div>
 
-      {/* Only show details for SHARED entries */}
-      {entry?.isShared && (
+      {shared && (
         <>
-          {entry.daytimeLocation && (
+          {shared.daytimeLocation && (
             <div className="mb-0.5 flex items-start gap-0.5 text-[10px] leading-tight sm:text-xs">
               <DisplayIcon name={daytimeIcon} className="mt-0.5 h-3 w-3 shrink-0 opacity-70" />
               <span className="truncate">
                 {getDaytimeLabelFromSettings(
-                  entry.daytimeLocation,
-                  entry.daytimeLocationOther,
+                  shared.daytimeLocation,
+                  shared.daytimeLocationOther,
                   displaySettings,
                 )}
               </span>
             </div>
           )}
 
-          {entry.activity && (
+          {shared.activity && (
             <div className="mb-0.5 flex items-start gap-0.5 text-[10px] leading-tight sm:text-xs">
               <DisplayIcon name={activityIcon} className="mt-0.5 h-3 w-3 shrink-0 opacity-70" />
               <span className="truncate">
                 {getActivityLabelFromSettings(
-                  entry.activity,
-                  entry.activityOther,
+                  shared.activity,
+                  shared.activityOther,
                   displaySettings,
                 )}
               </span>
             </div>
           )}
 
-          {entry.pickedUpBy && entry.pickedUpBy !== 'nvt' && (
+          {shared.pickedUpBy && shared.pickedUpBy !== 'nvt' && (
             <div className="mb-0.5 flex items-start gap-0.5 text-[10px] leading-tight sm:text-xs">
-              <DisplayIcon name={pickupIcon} className="mt-0.5 h-3 w-3 shrink-0 opacity-70" />
+              <DisplayIcon name="car" className="mt-0.5 h-3 w-3 shrink-0 opacity-70" />
               <span className="truncate">
                 {getPersonLabelFromSettings(
-                  entry.pickedUpBy,
-                  entry.pickedUpByOther,
+                  shared.pickedUpBy,
+                  shared.pickedUpByOther,
                   displaySettings,
                 )}
               </span>
             </div>
           )}
 
-          {entry.sleepLocation && (
+          {shared.sleepLocation && (
             <div className="mt-auto flex items-center gap-0.5 text-[10px] font-semibold leading-tight sm:text-xs">
               <DisplayIcon name={sleepIcon} className="h-3 w-3 shrink-0" />
               <span className="truncate">
-                {getSleepLabelFromSettings(entry.sleepLocation, displaySettings)}
+                {getSleepLabelFromSettings(shared.sleepLocation, displaySettings)}
               </span>
             </div>
           )}
 
-          {entry.broughtBy && entry.broughtBy !== 'nvt' && !entry.pickedUpBy && (
+          {shared.broughtBy && shared.broughtBy !== 'nvt' && !shared.pickedUpBy && (
             <div className="flex items-start gap-0.5 text-[10px] leading-tight sm:text-xs">
-              <DisplayIcon name={bringIcon} className="mt-0.5 h-3 w-3 shrink-0 opacity-70" />
+              <DisplayIcon name="car" className="mt-0.5 h-3 w-3 shrink-0 opacity-70" />
               <span className="truncate">
                 {getPersonLabelFromSettings(
-                  entry.broughtBy,
-                  entry.broughtByOther,
+                  shared.broughtBy,
+                  shared.broughtByOther,
                   displaySettings,
                 )}
               </span>
@@ -151,12 +186,13 @@ export function DayCell({
         </>
       )}
 
-      {/* For PRIVATE entries, just show "Privé" text */}
-      {entry && !entry.isShared && (
-        <div className="mt-auto text-[10px] text-purple-600 font-medium">
-          Privé afspraak
+      {hasOwnPrivate && (
+        <div className={cn('text-[10px] font-medium text-purple-600', shared ? 'mt-1' : 'mt-auto')}>
+          {ownPrivates.length === 1
+            ? (ownPrivates[0].title || 'Privé afspraak')
+            : `${ownPrivates.length} privé`}
         </div>
       )}
     </button>
   );
-}
+});

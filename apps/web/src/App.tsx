@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import { useOnline } from './contexts/OnlineContext';
@@ -46,10 +46,13 @@ function AppLayout() {
 
   return (
     <DisplaySettingsProvider>
-      <div className="mx-auto min-h-screen max-w-lg bg-gray-50">
+      <div
+        className="mx-auto min-h-screen max-w-4xl bg-gray-50 sm:shadow-sm"
+        style={{ '--app-sticky-offset': isOnline ? '0px' : '40px' } as CSSProperties}
+      >
         {!isOnline && (
           <div
-            className="flex items-center justify-center gap-2 bg-amber-500 px-4 py-2 text-sm font-medium text-white"
+            className="sticky top-0 z-30 flex items-center justify-center gap-2 bg-amber-500 px-4 py-2 text-sm font-medium text-white"
             role="status"
           >
             <WifiOff className="h-4 w-4" aria-hidden />

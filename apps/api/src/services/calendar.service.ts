@@ -221,58 +221,133 @@ function normalizeInput(input: CalendarEntryInput) {
   };
 }
 
-export async function upsertEntry(
+export async function getEntryById(householdId: string, userId: string, id: string) {
+  const db = getDb();
+  const entries = await db
+    .select({
+      id: calendarEntries.id,
+      householdId: calendarEntries.householdId,
+      date: calendarEntries.date,
+      daytimeLocation: calendarEntries.daytimeLocation,
+      daytimeLocationOther: calendarEntries.daytimeLocationOther,
+      activity: calendarEntries.activity,
+      activityOther: calendarEntries.activityOther,
+      sleepLocation: calendarEntries.sleepLocation,
+      broughtBy: calendarEntries.broughtBy,
+      broughtByOther: calendarEntries.broughtByOther,
+      pickedUpBy: calendarEntries.pickedUpBy,
+      pickedUpByOther: calendarEntries.pickedUpByOther,
+      note: calendarEntries.note,
+      isShared: calendarEntries.isShared,
+      ownerId: calendarEntries.ownerId,
+      title: calendarEntries.title,
+      time: calendarEntries.time,
+      createdBy: calendarEntries.createdBy,
+      updatedBy: calendarEntries.updatedBy,
+      createdAt: calendarEntries.createdAt,
+      updatedAt: calendarEntries.updatedAt,
+      version: calendarEntries.version,
+      updatedByName: users.name,
+    })
+    .from(calendarEntries)
+    .leftJoin(users, eq(calendarEntries.updatedBy, users.id))
+    .where(
+      and(
+        eq(calendarEntries.householdId, householdId),
+        eq(calendarEntries.id, id),
+        or(
+          eq(calendarEntries.isShared, true),
+          eq(calendarEntries.ownerId, userId),
+        ),
+      ),
+    )
+    .limit(1);
+
+  return entries[0] ? entryToJson(entries[0]) : null;
+}
+
+async function getSharedEntryForDate(householdId: string, date: string, userId: string) {
+  const entries = await getAllEntriesForDate(householdId, date, userId);
+  return entries.find((e) => e.isShared) ?? null;
+}
+
+async function conflictResult(existing: Awaited<ReturnType<typeof getEntryByDate>>) {
+  const db = getDb();
+  if (!existing) {
+    return {
+      conflict: true as const,
+      currentEntry: existing,
+      updatedByName: 'Onbekend',
+    };
+  }
+  const updater = await db
+    .select({ name: users.name })
+    .from(users)
+    .where(eq(users.id, existing.updatedBy))
+    .limit(1);
+  return {
+    conflict: true as const,
+    currentEntry: existing,
+    updatedByName: updater[0]?.name ?? 'Onbekend',
+  };
+}
+
+async function persistUpdate(
+  householdId: string,
+  userId: string,
+  existing: NonNullable<Awaited<ReturnType<typeof getEntryByDate>>>,
+  normalized: ReturnType<typeof normalizeInput>,
+) {
+  const db = getDb();
+  const previousValues = { ...existing };
+  // Keep visibility/ownership stable on update — never convert shared↔private here.
+  const updateSet = existing.isShared
+    ? { ...normalized, isShared: true, ownerId: null as string | null }
+    : {
+        title: normalized.title,
+        time: normalized.time,
+        note: normalized.note,
+        isShared: false,
+        ownerId: existing.ownerId ?? userId,
+      };
+
+  const [updated] = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(calendarEntries)
+      .set({
+        ...updateSet,
+        updatedBy: userId,
+        updatedAt: new Date(),
+        version: existing.version + 1,
+      })
+      .where(eq(calendarEntries.id, existing.id))
+      .returning();
+
+    await tx.insert(auditLogs).values({
+      householdId,
+      calendarEntryId: existing.id,
+      userId,
+      action: 'update',
+      previousValues: previousValues as unknown as Record<string, unknown>,
+      newValues: normalized as unknown as Record<string, unknown>,
+    });
+
+    return [row];
+  });
+
+  return {
+    conflict: false as const,
+    entry: await getEntryById(householdId, userId, updated.id),
+  };
+}
+
+async function persistInsert(
   householdId: string,
   date: string,
   userId: string,
-  input: CalendarEntryInput,
+  normalized: ReturnType<typeof normalizeInput>,
 ) {
   const db = getDb();
-  const normalized = normalizeInput(input);
-  const existing = await getEntryByDate(householdId, date, userId);
-
-  if (existing) {
-    if (input.version !== undefined && input.version !== existing.version) {
-      const updater = await db
-        .select({ name: users.name })
-        .from(users)
-        .where(eq(users.id, existing.updatedBy))
-        .limit(1);
-      return {
-        conflict: true as const,
-        currentEntry: existing,
-        updatedByName: updater[0]?.name ?? 'Onbekend',
-      };
-    }
-
-    const previousValues = { ...existing };
-    const [updated] = await db.transaction(async (tx) => {
-      const [row] = await tx
-        .update(calendarEntries)
-        .set({
-          ...normalized,
-          updatedBy: userId,
-          updatedAt: new Date(),
-          version: existing.version + 1,
-        })
-        .where(eq(calendarEntries.id, existing.id))
-        .returning();
-
-      await tx.insert(auditLogs).values({
-        householdId,
-        calendarEntryId: existing.id,
-        userId,
-        action: 'update',
-        previousValues: previousValues as unknown as Record<string, unknown>,
-        newValues: normalized as unknown as Record<string, unknown>,
-      });
-
-      return [row];
-    });
-
-    return { conflict: false as const, entry: await getEntryByDate(householdId, updated.date as string, userId) };
-  }
-
   const [created] = await db.transaction(async (tx) => {
     const [row] = await tx
       .insert(calendarEntries)
@@ -299,17 +374,75 @@ export async function upsertEntry(
     return [row];
   });
 
-  return { conflict: false as const, entry: await getEntryByDate(householdId, created.date as string, userId) };
+  return {
+    conflict: false as const,
+    entry: await getEntryById(householdId, userId, created.id),
+  };
+}
+
+export async function upsertEntry(
+  householdId: string,
+  date: string,
+  userId: string,
+  input: CalendarEntryInput,
+) {
+  const normalized = normalizeInput(input);
+
+  if (input.id) {
+    const existing = await getEntryById(householdId, userId, input.id);
+    if (!existing || existing.date !== date) {
+      // Fail-closed: never create or mutate an entry the caller cannot see.
+      return { conflict: false as const, entry: null };
+    }
+    if (input.version !== undefined && input.version !== existing.version) {
+      return conflictResult(existing);
+    }
+    return persistUpdate(householdId, userId, existing, normalized);
+  }
+
+  if (normalized.isShared) {
+    const existing = await getSharedEntryForDate(householdId, date, userId);
+    if (existing) {
+      if (input.version !== undefined && input.version !== existing.version) {
+        return conflictResult(existing);
+      }
+      return persistUpdate(householdId, userId, existing, normalized);
+    }
+    return persistInsert(householdId, date, userId, normalized);
+  }
+
+  // Private: update only when a matching owned row is explicitly targeted
+  // (version of the single existing private). Otherwise INSERT so a user
+  // can have multiple private entries on the same day.
+  const visible = await getAllEntriesForDate(householdId, date, userId);
+  const ownPrivates = visible.filter((e) => !e.isShared);
+  if (input.version !== undefined) {
+    const match =
+      ownPrivates.find((e) => e.version === input.version) ??
+      (ownPrivates.length === 1 ? ownPrivates[0] : undefined);
+    if (match) {
+      if (input.version !== match.version) {
+        return conflictResult(match);
+      }
+      return persistUpdate(householdId, userId, match, normalized);
+    }
+  }
+
+  return persistInsert(householdId, date, userId, normalized);
 }
 
 export async function deleteEntry(
   householdId: string,
   date: string,
   userId: string,
+  entryId?: string,
 ) {
   const db = getDb();
-  const existing = await getEntryByDate(householdId, date, userId);
-  if (!existing) return null;
+  const existing = entryId
+    ? await getEntryById(householdId, userId, entryId)
+    : await getSharedEntryForDate(householdId, date, userId);
+
+  if (!existing || existing.date !== date) return null;
 
   await db.transaction(async (tx) => {
     await tx.insert(auditLogs).values({

@@ -9,7 +9,6 @@ import {
   householdMembers,
   auditLogs,
   sessions,
-  calendarEntries,
 } from '../db/schema.js';
 
 const PAPA_EMAIL = 'papa@example.com';
@@ -139,7 +138,7 @@ describe('Privacy: Shared Entries', () => {
     });
     expect(mamaMonthRes.statusCode).toBe(200);
     const entries = mamaMonthRes.json().entries;
-    const found = entries.find((e: any) => e.date === '2026-09-20');
+    const found = entries.find((e: { date: string; note?: string }) => e.date === '2026-09-20');
     expect(found).toBeDefined();
     expect(found.note).toBe('Shared kinderregeling');
   });
@@ -190,8 +189,8 @@ describe('Privacy: Private Entries', () => {
       url: '/api/calendar/2026-09-21',
       cookies: { session: papaCookie },
       payload: {
-        daytimeLocation: 'papa',
-        sleepLocation: 'papa',
+        title: 'Tandarts',
+        time: '14:00',
         note: 'Papa private dentist appointment',
         isShared: false,
       },
@@ -222,7 +221,7 @@ describe('Privacy: Private Entries', () => {
     });
     expect(monthRes.statusCode).toBe(200);
     const entries = monthRes.json().entries;
-    const found = entries.find((e: any) => e.date === '2026-09-21');
+    const found = entries.find((e: { date: string; note?: string }) => e.date === '2026-09-21');
     expect(found).toBeDefined();
     expect(found.note).toBe('Papa private dentist appointment');
   });
@@ -252,7 +251,7 @@ describe('Privacy: Private Entries', () => {
     const entries = res.json().entries;
     
     // Should NOT contain Papa's private entry
-    const papaPrivate = entries.find((e: any) => 
+    const papaPrivate = entries.find((e: { date: string; note?: string }) => 
       e.date === '2026-09-21' && e.note === 'Papa private dentist appointment'
     );
     expect(papaPrivate).toBeUndefined();
@@ -270,7 +269,7 @@ describe('Privacy: Private Entries', () => {
     const data = res.json();
     
     // Should NOT contain Papa's private entry
-    const papaPrivate = data.entries.find((e: any) => 
+    const papaPrivate = data.entries.find((e: { date: string; note?: string }) => 
       e.date === '2026-09-21' && e.note === 'Papa private dentist appointment'
     );
     expect(papaPrivate).toBeUndefined();
@@ -285,8 +284,7 @@ describe('Privacy: Private Entries', () => {
       url: '/api/calendar/2026-09-21',
       cookies: { session: mamaCookie },
       payload: {
-        daytimeLocation: 'mama',
-        sleepLocation: 'mama',
+        title: 'Mama hijack attempt',
         note: 'Mama trying to hijack Papa appointment',
         isShared: false,
       },
@@ -362,10 +360,7 @@ describe('Privacy: Mixed Entries on Same Date', () => {
       url: `/api/calendar/${papaPrivateDate}`,
       cookies: { session: papaCookie },
       payload: {
-        daytimeLocation: 'papa',
-        activity: 'andere',
-        activityOther: 'Doctor appointment',
-        sleepLocation: 'papa',
+        title: 'Doctor appointment',
         note: 'Papa private meeting',
         isShared: false,
       },
@@ -378,10 +373,7 @@ describe('Privacy: Mixed Entries on Same Date', () => {
       url: `/api/calendar/${papaPrivateDate}`,
       cookies: { session: mamaCookie },
       payload: {
-        daytimeLocation: 'mama',
-        activity: 'andere',
-        activityOther: 'Hair salon',
-        sleepLocation: 'mama',
+        title: 'Hair salon',
         note: 'Mama private appointment',
         isShared: false,
       },
@@ -456,8 +448,7 @@ describe('Privacy: History and Audit Logs', () => {
       url: `/api/calendar/${testDate}`,
       cookies: { session: papaCookie },
       payload: {
-        daytimeLocation: 'papa',
-        sleepLocation: 'papa',
+        title: 'Papa private v1',
         note: 'Papa private v1',
         isShared: false,
       },
@@ -476,8 +467,7 @@ describe('Privacy: History and Audit Logs', () => {
       url: `/api/calendar/${testDate}`,
       cookies: { session: papaCookie },
       payload: {
-        daytimeLocation: 'papa',
-        sleepLocation: 'papa',
+        title: 'Papa private v2',
         note: 'Papa private v2',
         isShared: false,
         version,
@@ -516,8 +506,7 @@ describe('Privacy: Bulk Operations', () => {
         startDate: '2026-09-26',
         endDate: '2026-09-28',
         entry: {
-          daytimeLocation: 'papa',
-          sleepLocation: 'papa',
+          title: 'Papa bulk private',
           note: 'Papa bulk private',
           isShared: false,
         },
@@ -535,7 +524,7 @@ describe('Privacy: Bulk Operations', () => {
     expect(mamaMonthRes.statusCode).toBe(200);
     const entries = mamaMonthRes.json().entries;
     
-    const papaBulkEntries = entries.filter((e: any) => 
+    const papaBulkEntries = entries.filter((e: { date: string; note?: string }) => 
       e.note === 'Papa bulk private' &&
       ['2026-09-26', '2026-09-27', '2026-09-28'].includes(e.date)
     );
@@ -550,7 +539,7 @@ describe('Privacy: Bulk Operations', () => {
     expect(papaMonthRes.statusCode).toBe(200);
     const papaEntries = papaMonthRes.json().entries;
     
-    const papaBulk = papaEntries.filter((e: any) => 
+    const papaBulk = papaEntries.filter((e: { date: string; note?: string }) => 
       e.note === 'Papa bulk private' &&
       ['2026-09-26', '2026-09-27', '2026-09-28'].includes(e.date)
     );
@@ -571,8 +560,7 @@ describe('Privacy: Copy Operations', () => {
       url: `/api/calendar/${sourceDate}`,
       cookies: { session: papaCookie },
       payload: {
-        daytimeLocation: 'papa',
-        sleepLocation: 'papa',
+        title: 'Papa private to copy',
         note: 'Papa private to copy',
         isShared: false,
       },
@@ -624,5 +612,153 @@ describe('Privacy: Copy Operations', () => {
     
     // Should return 404 (source entry not found for Mama)
     expect(copyRes.statusCode).toBe(404);
+  });
+});
+
+describe('Privacy: Multiple private entries per user/day', () => {
+  it('Papa can create two private entries on the same day', async () => {
+    if (!requireDb()) return;
+
+    const testDate = '2026-10-10';
+
+    const first = await app.inject({
+      method: 'PUT',
+      url: `/api/calendar/${testDate}`,
+      cookies: { session: papaCookie },
+      payload: {
+        title: 'Tandarts',
+        time: '10:00',
+        note: 'Eerste privé',
+        isShared: false,
+      },
+    });
+    expect(first.statusCode).toBe(200);
+    expect(first.json().entry.isShared).toBe(false);
+
+    const second = await app.inject({
+      method: 'PUT',
+      url: `/api/calendar/${testDate}`,
+      cookies: { session: papaCookie },
+      payload: {
+        title: 'Vergadering',
+        time: '16:00',
+        note: 'Tweede privé',
+        isShared: false,
+      },
+    });
+    expect(second.statusCode).toBe(200);
+    expect(second.json().entry.id).not.toBe(first.json().entry.id);
+
+    const allRes = await app.inject({
+      method: 'GET',
+      url: `/api/calendar/${testDate}/all`,
+      cookies: { session: papaCookie },
+    });
+    expect(allRes.statusCode).toBe(200);
+    const privates = allRes.json().entries.filter((e: { isShared: boolean }) => !e.isShared);
+    expect(privates).toHaveLength(2);
+
+    const monthRes = await app.inject({
+      method: 'GET',
+      url: '/api/calendar?year=2026&month=10',
+      cookies: { session: papaCookie },
+    });
+    const monthPrivates = monthRes.json().entries.filter(
+      (e: { date: string; isShared: boolean }) => e.date === testDate && !e.isShared,
+    );
+    expect(monthPrivates).toHaveLength(2);
+  });
+
+  it('same-day shared + private: owner sees both layers, other parent sees only shared', async () => {
+    if (!requireDb()) return;
+
+    const testDate = '2026-10-11';
+
+    await app.inject({
+      method: 'PUT',
+      url: `/api/calendar/${testDate}`,
+      cookies: { session: papaCookie },
+      payload: {
+        daytimeLocation: 'papa',
+        sleepLocation: 'papa',
+        note: 'Gedeelde kinderregeling 11 okt',
+        isShared: true,
+      },
+    });
+
+    await app.inject({
+      method: 'PUT',
+      url: `/api/calendar/${testDate}`,
+      cookies: { session: papaCookie },
+      payload: {
+        title: 'Sportles',
+        time: '18:00',
+        note: 'Papa privé naast kinderregeling',
+        isShared: false,
+      },
+    });
+
+    const papaAll = await app.inject({
+      method: 'GET',
+      url: `/api/calendar/${testDate}/all`,
+      cookies: { session: papaCookie },
+    });
+    expect(papaAll.statusCode).toBe(200);
+    const papaEntries = papaAll.json().entries as Array<{ isShared: boolean; note: string }>;
+    expect(papaEntries.some((e) => e.isShared && e.note === 'Gedeelde kinderregeling 11 okt')).toBe(true);
+    expect(papaEntries.some((e) => !e.isShared && e.note === 'Papa privé naast kinderregeling')).toBe(true);
+
+    const mamaAll = await app.inject({
+      method: 'GET',
+      url: `/api/calendar/${testDate}/all`,
+      cookies: { session: mamaCookie },
+    });
+    expect(mamaAll.statusCode).toBe(200);
+    const mamaEntries = mamaAll.json().entries as Array<{ isShared: boolean; note: string }>;
+    expect(mamaEntries).toHaveLength(1);
+    expect(mamaEntries[0].isShared).toBe(true);
+    expect(mamaEntries[0].note).toBe('Gedeelde kinderregeling 11 okt');
+    expect(mamaEntries.some((e) => e.note === 'Papa privé naast kinderregeling')).toBe(false);
+
+    const mamaMonth = await app.inject({
+      method: 'GET',
+      url: '/api/calendar?year=2026&month=10',
+      cookies: { session: mamaCookie },
+    });
+    const mamaMonthForDay = mamaMonth.json().entries.filter((e: { date: string }) => e.date === testDate);
+    expect(mamaMonthForDay).toHaveLength(1);
+    expect(mamaMonthForDay[0].isShared).toBe(true);
+    expect(mamaMonthForDay[0].title).not.toBe('Sportles');
+  });
+
+  it('Mama cannot delete Papa private by id', async () => {
+    if (!requireDb()) return;
+
+    const testDate = '2026-10-12';
+    const created = await app.inject({
+      method: 'PUT',
+      url: `/api/calendar/${testDate}`,
+      cookies: { session: papaCookie },
+      payload: {
+        title: 'Geheim',
+        isShared: false,
+      },
+    });
+    const id = created.json().entry.id as string;
+
+    const del = await app.inject({
+      method: 'DELETE',
+      url: `/api/calendar/${testDate}?id=${id}`,
+      cookies: { session: mamaCookie },
+    });
+    expect(del.statusCode).toBe(404);
+
+    const papaStill = await app.inject({
+      method: 'GET',
+      url: `/api/calendar/${testDate}`,
+      cookies: { session: papaCookie },
+    });
+    expect(papaStill.statusCode).toBe(200);
+    expect(papaStill.json().entry.id).toBe(id);
   });
 });

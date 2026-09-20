@@ -13,6 +13,10 @@ import { Download, Upload, Printer } from 'lucide-react';
 import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
+import { EmptyState } from '../components/EmptyState';
+import { EntryForm } from '../components/EntryForm';
+import { useUpsertEntry, useBulkEntries } from '../hooks/useCalendar';
+import type { CalendarEntryInput } from '@kids-calendar/shared';
 
 export function OverviewPage() {
   const navigate = useNavigate();
@@ -20,6 +24,9 @@ export function OverviewPage() {
   const [monthFilter, setMonthFilter] = useState('');
   const [sleepFilter, setSleepFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const upsert = useUpsertEntry();
+  const bulk = useBulkEntries();
 
   const { data, isLoading } = useQuery({
     queryKey: ['calendar-all'],
@@ -39,11 +46,27 @@ export function OverviewPage() {
     if (!data) return [];
     return data.filter((e) => {
       if (monthFilter && !e.date.startsWith(monthFilter)) return false;
-      if (sleepFilter && e.sleepLocation !== sleepFilter) return false;
-      if (search && !(e.note?.toLowerCase().includes(search.toLowerCase()))) return false;
+      if (sleepFilter && e.isShared && e.sleepLocation !== sleepFilter) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        const hay = `${e.note ?? ''} ${e.title ?? ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
       return true;
     });
   }, [data, monthFilter, sleepFilter, search]);
+
+  const handleSave = async (
+    date: string,
+    formData: CalendarEntryInput,
+    options?: { bulk?: boolean; endDate?: string },
+  ) => {
+    if (options?.bulk && options.endDate) {
+      await bulk.mutateAsync({ startDate: date, endDate: options.endDate, entry: formData });
+    } else {
+      await upsert.mutateAsync({ date, data: formData });
+    }
+  };
 
   const months = useMemo(() => {
     if (!data) return [];
@@ -151,10 +174,12 @@ export function OverviewPage() {
 
       <ul className="space-y-2">
         {filtered.map((entry) => {
-          const color = getSleepColorFromSettings(
-            entry.sleepLocation as SleepLocation | undefined,
-            displaySettings,
-          );
+          const color = entry.isShared
+            ? getSleepColorFromSettings(
+                entry.sleepLocation as SleepLocation | undefined,
+                displaySettings,
+              )
+            : { border: '#9333EA' };
           return (
             <li key={entry.id}>
               <button
@@ -167,29 +192,46 @@ export function OverviewPage() {
                   {format(parseISO(entry.date), 'd MMM', { locale: nl })}
                 </div>
                 <div className="flex-1 text-sm">
-                  <span>
-                    {getDaytimeLabelFromSettings(
-                      entry.daytimeLocation,
-                      entry.daytimeLocationOther,
-                      displaySettings,
-                    )}
-                  </span>
-                  {entry.activity && (
+                  {entry.isShared ? (
                     <>
-                      <span className="mx-2 text-gray-400">·</span>
                       <span>
-                        {getActivityLabelFromSettings(
-                          entry.activity,
-                          entry.activityOther,
+                        {getDaytimeLabelFromSettings(
+                          entry.daytimeLocation,
+                          entry.daytimeLocationOther,
                           displaySettings,
                         )}
                       </span>
+                      {entry.activity && (
+                        <>
+                          <span className="mx-2 text-gray-400">·</span>
+                          <span>
+                            {getActivityLabelFromSettings(
+                              entry.activity,
+                              entry.activityOther,
+                              displaySettings,
+                            )}
+                          </span>
+                        </>
+                      )}
+                      <span className="mx-2 text-gray-400">·</span>
+                      <span className="font-medium">
+                        {getSleepLabelFromSettings(entry.sleepLocation, displaySettings)}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-medium">{entry.title || 'Privé afspraak'}</span>
+                      {entry.time && (
+                        <>
+                          <span className="mx-2 text-gray-400">·</span>
+                          <span>{entry.time}</span>
+                        </>
+                      )}
+                      <span className="ml-2 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">
+                        Privé
+                      </span>
                     </>
                   )}
-                  <span className="mx-2 text-gray-400">·</span>
-                  <span className="font-medium">
-                    {getSleepLabelFromSettings(entry.sleepLocation, displaySettings)}
-                  </span>
                 </div>
               </button>
             </li>
@@ -198,8 +240,18 @@ export function OverviewPage() {
       </ul>
 
       {!isLoading && filtered.length === 0 && (
-        <p className="py-8 text-center text-gray-500">Geen regelingen gevonden.</p>
+        <EmptyState
+          title="Geen regelingen gevonden"
+          description="Tik op + Regeling om een kinderregeling toe te voegen."
+          onAction={() => setShowForm(true)}
+        />
       )}
+
+      <EntryForm
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        onSave={handleSave}
+      />
     </div>
   );
 }
