@@ -19,7 +19,8 @@ interface EntryFormProps {
   open: boolean;
   onClose: () => void;
   initialDate?: string;
-  initialData?: CalendarEntryInput & { version?: number };
+  initialData?: CalendarEntryInput & { version?: number; id?: string };
+  defaultShared?: boolean;
   onSave: (date: string, data: CalendarEntryInput, options?: { nextDay?: boolean; copyTomorrow?: boolean; bulk?: boolean; endDate?: string }) => Promise<void>;
   mode?: 'create' | 'edit';
 }
@@ -45,6 +46,7 @@ export function EntryForm({
   onClose,
   initialDate,
   initialData,
+  defaultShared = true,
   onSave,
   mode = 'create',
 }: EntryFormProps) {
@@ -111,13 +113,17 @@ export function EntryForm({
   useEffect(() => {
     if (open) {
       setDate(initialDate ?? format(new Date(), 'yyyy-MM-dd'));
-      setForm(initialData ? { ...emptyForm, ...initialData } : emptyForm);
+      setForm(
+        initialData
+          ? { ...emptyForm, ...initialData }
+          : { ...emptyForm, isShared: defaultShared },
+      );
       setVersion(initialData?.version);
       setEndDate('');
       setMultiDay(false);
       setError('');
     }
-  }, [open, initialDate, initialData]);
+  }, [open, initialDate, initialData, defaultShared]);
 
   const update = <K extends keyof CalendarEntryInput>(
     key: K,
@@ -153,7 +159,7 @@ export function EntryForm({
     setError('');
 
     try {
-      const data = { ...form, version };
+      const data = { ...form, version, id: initialData?.id };
       if (multiDay && endDate) {
         await onSave(date, data, { bulk: true, endDate });
       } else if (options?.copyTomorrow) {
@@ -188,7 +194,19 @@ export function EntryForm({
   })();
 
   return (
-    <Modal open={open} onClose={onClose} title={mode === 'edit' ? 'Regeling bewerken' : 'Regeling toevoegen'}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={
+        mode === 'edit'
+          ? form.isShared
+            ? 'Regeling bewerken'
+            : 'Privé afspraak bewerken'
+          : form.isShared
+            ? 'Regeling toevoegen'
+            : 'Privé afspraak toevoegen'
+      }
+    >
       {!isOnline && (
         <div className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800" role="alert">
           U bent offline. Alleen bekijken is mogelijk.
@@ -218,8 +236,8 @@ export function EntryForm({
             <button
               type="button"
               onClick={() => update('isShared', true)}
-              disabled={!isOnline}
-              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              disabled={!isOnline || mode === 'edit'}
+              className={`btn-touch flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                 form.isShared
                   ? 'bg-blue-600 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
@@ -230,8 +248,8 @@ export function EntryForm({
             <button
               type="button"
               onClick={() => update('isShared', false)}
-              disabled={!isOnline}
-              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              disabled={!isOnline || mode === 'edit'}
+              className={`btn-touch flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                 !form.isShared
                   ? 'bg-purple-600 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
@@ -450,7 +468,7 @@ export function EntryForm({
           >
             {saveLabel}
           </button>
-          {mode === 'create' && !multiDay && (
+          {mode === 'create' && !multiDay && form.isShared && (
             <>
               <button
                 type="button"

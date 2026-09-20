@@ -1,5 +1,5 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import { getSessionUser, SESSION_COOKIE } from '../services/auth.service.js';
+import { getCookieOptions, getSessionUser, SESSION_COOKIE } from '../services/auth.service.js';
 import { sendError } from '../lib/utils.js';
 import type { AuthUser } from '@kids-calendar/shared';
 
@@ -17,7 +17,7 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply) 
 
   const user = await getSessionUser(token);
   if (!user) {
-    reply.clearCookie(SESSION_COOKIE, { path: '/' });
+    reply.clearCookie(SESSION_COOKIE, getCookieOptions());
     return sendError(reply, 401, 'UNAUTHORIZED', 'Uw sessie is verlopen. Log opnieuw in.');
   }
 

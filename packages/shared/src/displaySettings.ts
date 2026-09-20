@@ -278,9 +278,10 @@ export function getSleepColorFromSettings(
   settings: HouseholdDisplaySettings,
 ): LocationColor {
   if (!location) return { ...EMPTY_DAY_COLOR };
-  const item = settings.sleep[location];
+  const item = settings.sleep?.[location];
+  if (!item) return { ...EMPTY_DAY_COLOR, label: location };
   const colors = resolvePaletteColors(item.paletteId);
-  return { ...colors, label: item.label };
+  return { ...colors, label: item.label || location };
 }
 
 export function getDaytimeCareColorFromSettings(
@@ -298,10 +299,10 @@ export function getDaytimeLabelFromSettings(
 ): string {
   if (!location) return '—';
   if (location === 'andere' && other) return other;
-  if (location !== 'andere' && settings.sleep[location]?.label) {
+  if (location !== 'andere' && settings.sleep?.[location]?.label) {
     return settings.sleep[location].label;
   }
-  return settings.daytime[location].label;
+  return settings.daytime?.[location]?.label || DAYTIME_LOCATION_LABELS[location] || '—';
 }
 
 export function getActivityLabelFromSettings(
@@ -311,7 +312,7 @@ export function getActivityLabelFromSettings(
 ): string {
   if (!activity) return '—';
   if (activity === 'andere' && other) return other;
-  return settings.activities[activity].label;
+  return settings.activities?.[activity]?.label || ACTIVITY_LABELS[activity] || '—';
 }
 
 export function getPersonLabelFromSettings(
@@ -330,7 +331,7 @@ export function getPersonLabelFromSettings(
   ) {
     return settings.sleep[person]?.label ?? settings.persons[person].label;
   }
-  return settings.persons[person].label;
+  return settings.persons?.[person]?.label || PERSON_LABELS[person] || '—';
 }
 
 export function getSleepLabelFromSettings(
@@ -338,7 +339,15 @@ export function getSleepLabelFromSettings(
   settings: HouseholdDisplaySettings,
 ): string {
   if (!location) return 'Niet ingevuld';
-  return settings.sleep[location].label;
+  return settings.sleep?.[location]?.label || SLEEP_LOCATION_LABELS[location] || 'Niet ingevuld';
+}
+
+export function getDisplayIconFromSettings(
+  item: { icon?: DisplayIconKey } | undefined | null,
+  fallback: DisplayIconKey,
+): DisplayIconKey {
+  if (item?.icon && DISPLAY_ICON_KEYS.includes(item.icon)) return item.icon;
+  return fallback;
 }
 
 export function getDayCellBackgroundFromSettings(

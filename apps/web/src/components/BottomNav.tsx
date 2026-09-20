@@ -21,7 +21,7 @@ export function BottomNav({ onAddClick }: BottomNavProps) {
       className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)]"
       aria-label="Hoofdnavigatie"
     >
-      <div className="relative mx-auto flex max-w-lg items-end justify-around px-2 pt-1">
+      <div className="relative mx-auto flex max-w-4xl items-end justify-around px-2 pt-1">
         {navItems.slice(0, 2).map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}

@@ -105,3 +105,97 @@ describe('Offline state', () => {
     expect(navigator.onLine).toBeDefined();
   });
 });
+
+describe('Multi-entry grouping', () => {
+  it('houdt shared + meerdere privé-lagen per dag bij', async () => {
+    const { groupEntriesByDate, splitDayEntries } = await import('../lib/entries');
+    const grouped = groupEntriesByDate([
+      {
+        id: 's',
+        householdId: 'h',
+        date: '2026-10-11',
+        daytimeLocation: 'papa',
+        daytimeLocationOther: null,
+        activity: null,
+        activityOther: null,
+        sleepLocation: 'papa',
+        broughtBy: null,
+        broughtByOther: null,
+        pickedUpBy: null,
+        pickedUpByOther: null,
+        note: 'kinderregeling',
+        isShared: true,
+        createdBy: 'u1',
+        updatedBy: 'u1',
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+        version: 1,
+      },
+      {
+        id: 'p1',
+        householdId: 'h',
+        date: '2026-10-11',
+        daytimeLocation: null,
+        daytimeLocationOther: null,
+        activity: null,
+        activityOther: null,
+        sleepLocation: null,
+        broughtBy: null,
+        broughtByOther: null,
+        pickedUpBy: null,
+        pickedUpByOther: null,
+        note: 'privé 1',
+        isShared: false,
+        title: 'Tandarts',
+        time: '10:00',
+        createdBy: 'u1',
+        updatedBy: 'u1',
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+        version: 1,
+      },
+      {
+        id: 'p2',
+        householdId: 'h',
+        date: '2026-10-11',
+        daytimeLocation: null,
+        daytimeLocationOther: null,
+        activity: null,
+        activityOther: null,
+        sleepLocation: null,
+        broughtBy: null,
+        broughtByOther: null,
+        pickedUpBy: null,
+        pickedUpByOther: null,
+        note: 'privé 2',
+        isShared: false,
+        title: 'Vergadering',
+        createdBy: 'u1',
+        updatedBy: 'u1',
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+        version: 1,
+      },
+    ]);
+
+    const layers = grouped.get('2026-10-11') ?? [];
+    expect(layers).toHaveLength(3);
+    const { shared, privates } = splitDayEntries(layers);
+    expect(shared?.id).toBe('s');
+    expect(privates).toHaveLength(2);
+  });
+});
+
+describe('Color fallback', () => {
+  it('ontbrekende slaapinstelling valt terug op lege kleur', async () => {
+    const { getSleepColorFromSettings, EMPTY_DAY_COLOR, createDefaultDisplaySettings } =
+      await import('@kids-calendar/shared');
+    const settings = createDefaultDisplaySettings();
+    const missing = getSleepColorFromSettings(
+      'papa',
+      { ...settings, sleep: {} as typeof settings.sleep },
+    );
+    expect(missing.bg).toBe(EMPTY_DAY_COLOR.bg);
+    expect(missing.label).toBe('papa');
+  });
+});

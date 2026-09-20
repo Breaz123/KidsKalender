@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import {
   format,
   startOfMonth,
@@ -15,6 +15,9 @@ import { useNavigate } from 'react-router-dom';
 import { useCalendarMonth, useUpsertEntry, useBulkEntries, useToday } from '../hooks/useCalendar';
 import { DayCell } from '../components/DayCell';
 import { EntryForm } from '../components/EntryForm';
+import { EmptyState } from '../components/EmptyState';
+import { CalendarGridSkeleton } from '../components/Skeleton';
+import { groupEntriesByDate } from '../lib/entries';
 import type { CalendarEntryInput } from '@kids-calendar/shared';
 import { addDays, format as fmt } from 'date-fns';
 
@@ -25,6 +28,9 @@ export function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showForm, setShowForm] = useState(false);
   const [formDate, setFormDate] = useState<string>();
+  const [focusDate, setFocusDate] = useState<string | null>(null);
+  const [shouldFocusCell, setShouldFocusCell] = useState(false);
+  const cellRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const { data: todayStr } = useToday();
 
   const year = currentDate.getFullYear();
@@ -34,13 +40,26 @@ export function CalendarPage() {
   const upsert = useUpsertEntry();
   const bulk = useBulkEntries();
 
-  const entryMap = new Map(entries.map((e) => [e.date, e]));
+  const entriesByDate = useMemo(() => groupEntriesByDate(entries), [entries]);
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
   const startPad = (getDay(monthStart) + 6) % 7;
+
+  const firstDayStr = format(days[0], 'yyyy-MM-dd');
+  const todayInMonth = Boolean(todayStr && days.some((d) => format(d, 'yyyy-MM-dd') === todayStr));
+
+  useEffect(() => {
+    setFocusDate(todayInMonth && todayStr ? todayStr : firstDayStr);
+  }, [year, month, todayStr, todayInMonth, firstDayStr]);
+
+  useEffect(() => {
+    if (!shouldFocusCell || !focusDate) return;
+    cellRefs.current.get(focusDate)?.focus();
+    setShouldFocusCell(false);
+  }, [shouldFocusCell, focusDate]);
 
   const handleSave = async (
     date: string,
@@ -59,9 +78,57 @@ export function CalendarPage() {
     }
   };
 
+  const moveFocus = (delta: number) => {
+    const idx = days.findIndex((d) => format(d, 'yyyy-MM-dd') === focusDate);
+    const nextIdx = Math.max(0, Math.min(days.length - 1, (idx < 0 ? 0 : idx) + delta));
+    setFocusDate(format(days[nextIdx], 'yyyy-MM-dd'));
+    setShouldFocusCell(true);
+  };
+
+  const handleGridKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (showForm) return;
+    switch (event.key) {
+      case 'ArrowRight':
+        event.preventDefault();
+        moveFocus(1);
+        break;
+      case 'ArrowLeft':
+        event.preventDefault();
+        moveFocus(-1);
+        break;
+      case 'ArrowDown':
+        event.preventDefault();
+        moveFocus(7);
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+        moveFocus(-7);
+        break;
+      case 'Home':
+        event.preventDefault();
+        setFocusDate(format(days[0], 'yyyy-MM-dd'));
+        setShouldFocusCell(true);
+        break;
+      case 'End':
+        event.preventDefault();
+        setFocusDate(format(days[days.length - 1], 'yyyy-MM-dd'));
+        setShouldFocusCell(true);
+        break;
+      case 'Enter':
+      case ' ':
+        if (focusDate) {
+          event.preventDefault();
+          navigate(`/dag/${focusDate}`);
+        }
+        break;
+      default:
+        break;
+    }
+  };
+
   return (
     <div className="pb-24">
-      <header className="sticky top-0 z-10 border-b border-gray-200 bg-white px-4 py-3">
+      <header className="sticky top-[var(--app-sticky-offset,0px)] z-10 border-b border-gray-200 bg-white px-4 py-3">
         <div className="flex items-center justify-between">
           <button
             type="button"
@@ -86,7 +153,7 @@ export function CalendarPage() {
                   setCurrentDate(new Date());
                 }
               }}
-              className="text-sm text-blue-600 hover:underline"
+              className="btn-touch text-sm text-blue-600 hover:underline"
             >
               Naar vandaag
             </button>
@@ -108,7 +175,7 @@ export function CalendarPage() {
             onChange={(e) =>
               setCurrentDate(new Date(year, parseInt(e.target.value, 10) - 1, 1))
             }
-            className="rounded-lg border border-gray-300 px-2 py-1 text-sm"
+            className="min-h-touch rounded-lg border border-gray-300 px-3 py-2 text-sm"
             aria-label="Maand kiezen"
           >
             {Array.from({ length: 12 }, (_, i) => (
@@ -122,7 +189,7 @@ export function CalendarPage() {
             onChange={(e) =>
               setCurrentDate(new Date(parseInt(e.target.value, 10), month - 1, 1))
             }
-            className="rounded-lg border border-gray-300 px-2 py-1 text-sm"
+            className="min-h-touch rounded-lg border border-gray-300 px-3 py-2 text-sm"
             aria-label="Jaar kiezen"
           >
             {Array.from({ length: 11 }, (_, i) => year - 5 + i).map((y) => (
@@ -135,19 +202,13 @@ export function CalendarPage() {
       </header>
 
       <div className="p-2 sm:p-4">
-        {isLoading && (
-          <div className="py-12 text-center text-gray-500" role="status">
-            Kalender laden…
-          </div>
-        )}
-
         {isError && (
           <div className="rounded-lg bg-red-50 p-4 text-center text-red-700" role="alert">
             {(error as Error)?.message ?? 'Kon kalender niet laden.'}
           </div>
         )}
 
-        {!isLoading && !isError && (
+        {!isError && (
           <>
             <div className="mb-1 grid grid-cols-7 gap-1">
               {WEEKDAYS.map((d) => (
@@ -157,29 +218,52 @@ export function CalendarPage() {
               ))}
             </div>
 
-            <div className="grid grid-cols-7 gap-1">
-              {Array.from({ length: startPad }).map((_, i) => (
-                <div key={`pad-${i}`} />
-              ))}
-              {days.map((day) => {
-                const dateStr = format(day, 'yyyy-MM-dd');
-                const isTodayDate = todayStr === dateStr;
-                return (
-                  <DayCell
-                    key={dateStr}
-                    day={day.getDate()}
-                    entry={entryMap.get(dateStr)}
-                    isToday={isTodayDate}
-                    onClick={() => navigate(`/dag/${dateStr}`)}
-                  />
-                );
-              })}
-            </div>
+            {isLoading ? (
+              <CalendarGridSkeleton />
+            ) : (
+              <div
+                role="grid"
+                aria-label={`Kalender ${format(currentDate, 'MMMM yyyy', { locale: nl })}`}
+                onKeyDown={handleGridKeyDown}
+                className="grid grid-cols-7 gap-1"
+              >
+                {Array.from({ length: startPad }).map((_, i) => (
+                  <div key={`pad-${i}`} role="presentation" />
+                ))}
+                {days.map((day) => {
+                  const dateStr = format(day, 'yyyy-MM-dd');
+                  const isTodayDate = todayStr === dateStr;
+                  return (
+                    <div key={dateStr} role="gridcell">
+                      <DayCell
+                        ref={(el) => {
+                          if (el) cellRefs.current.set(dateStr, el);
+                          else cellRefs.current.delete(dateStr);
+                        }}
+                        day={day.getDate()}
+                        date={day}
+                        entries={entriesByDate.get(dateStr) ?? []}
+                        isToday={isTodayDate}
+                        tabIndex={focusDate === dateStr ? 0 : -1}
+                        onClick={() => navigate(`/dag/${dateStr}`)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
-            {entries.length === 0 && (
-              <p className="mt-6 text-center text-sm text-gray-500">
-                Geen regelingen deze maand. Tik op + om te beginnen.
-              </p>
+            {!isLoading && entries.length === 0 && (
+              <div className="mt-6">
+                <EmptyState
+                  title="Geen regelingen deze maand"
+                  description="Tik op + Regeling om te beginnen."
+                  onAction={() => {
+                    setFormDate(todayStr);
+                    setShowForm(true);
+                  }}
+                />
+              </div>
             )}
           </>
         )}

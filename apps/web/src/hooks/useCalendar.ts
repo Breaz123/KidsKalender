@@ -52,15 +52,29 @@ export function useCalendarEntry(date: string | null) {
   });
 }
 
+export function useCalendarDayEntries(date: string | null) {
+  return useQuery({
+    queryKey: ['calendar-day', date],
+    queryFn: () => api.getEntriesForDate(date!).then((r) => r.entries),
+    enabled: !!date,
+  });
+}
+
+function invalidateDay(qc: ReturnType<typeof useQueryClient>, date: string) {
+  const [y, m] = date.split('-').map(Number);
+  qc.invalidateQueries({ queryKey: ['calendar', y, m] });
+  qc.invalidateQueries({ queryKey: ['calendar-entry', date] });
+  qc.invalidateQueries({ queryKey: ['calendar-day', date] });
+  qc.invalidateQueries({ queryKey: ['calendar-all'] });
+}
+
 export function useUpsertEntry() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ date, data }: { date: string; data: CalendarEntryInput }) =>
       api.upsertEntry(date, data),
     onSuccess: (_data, vars) => {
-      const [y, m] = vars.date.split('-').map(Number);
-      qc.invalidateQueries({ queryKey: ['calendar', y, m] });
-      qc.invalidateQueries({ queryKey: ['calendar-entry', vars.date] });
+      invalidateDay(qc, vars.date);
     },
   });
 }
@@ -68,11 +82,13 @@ export function useUpsertEntry() {
 export function useDeleteEntry() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (date: string) => api.deleteEntry(date),
-    onSuccess: (_data, date) => {
-      const [y, m] = date.split('-').map(Number);
-      qc.invalidateQueries({ queryKey: ['calendar', y, m] });
-      qc.invalidateQueries({ queryKey: ['calendar-entry', date] });
+    mutationFn: (input: string | { date: string; id?: string }) =>
+      typeof input === 'string'
+        ? api.deleteEntry(input)
+        : api.deleteEntry(input.date, input.id),
+    onSuccess: (_data, input) => {
+      const date = typeof input === 'string' ? input : input.date;
+      invalidateDay(qc, date);
     },
   });
 }
@@ -91,6 +107,8 @@ export function useBulkEntries() {
     }) => api.bulkEntries(startDate, endDate, entry),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['calendar'] });
+      qc.invalidateQueries({ queryKey: ['calendar-day'] });
+      qc.invalidateQueries({ queryKey: ['calendar-all'] });
     },
   });
 }
@@ -108,6 +126,8 @@ export function useCopyEntry() {
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ['calendar'] });
       qc.invalidateQueries({ queryKey: ['calendar-entry', vars.targetDate] });
+      qc.invalidateQueries({ queryKey: ['calendar-day', vars.targetDate] });
+      qc.invalidateQueries({ queryKey: ['calendar-all'] });
     },
   });
 }

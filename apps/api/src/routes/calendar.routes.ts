@@ -9,6 +9,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { sendError, getDatesInRange } from '../lib/utils.js';
 import {
   getEntryByDate,
+  getAllEntriesForDate,
   getEntriesForMonth,
   getAllEntries,
   upsertEntry,
@@ -52,17 +53,36 @@ export async function calendarRoutes(app: FastifyInstance) {
     return { entries };
   });
 
+  app.get('/:date/all', async (request, reply) => {
+    const { date } = request.params as { date: string };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return sendError(reply, 400, 'VALIDATION_ERROR', 'Ongeldige datum.');
+    }
+
+    const entries = await getAllEntriesForDate(
+      request.user!.householdId,
+      date,
+      request.user!.id,
+    );
+    return { entries };
+  });
+
   app.get('/:date', async (request, reply) => {
     const { date } = request.params as { date: string };
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return sendError(reply, 400, 'VALIDATION_ERROR', 'Ongeldige datum.');
     }
 
+    const entries = await getAllEntriesForDate(
+      request.user!.householdId,
+      date,
+      request.user!.id,
+    );
     const entry = await getEntryByDate(request.user!.householdId, date, request.user!.id);
     if (!entry) {
       return sendError(reply, 404, 'NOT_FOUND', 'Geen regeling gevonden voor deze dag.');
     }
-    return { entry };
+    return { entry, entries };
   });
 
   app.put('/:date', async (request, reply) => {
@@ -96,6 +116,10 @@ export async function calendarRoutes(app: FastifyInstance) {
       });
     }
 
+    if (!result.entry) {
+      return sendError(reply, 404, 'NOT_FOUND', 'Geen regeling gevonden voor deze dag.');
+    }
+
     return { entry: result.entry };
   });
 
@@ -105,10 +129,13 @@ export async function calendarRoutes(app: FastifyInstance) {
       return sendError(reply, 400, 'VALIDATION_ERROR', 'Ongeldige datum.');
     }
 
+    const { id } = request.query as { id?: string };
+
     const deleted = await deleteEntry(
       request.user!.householdId,
       date,
       request.user!.id,
+      id,
     );
 
     if (!deleted) {
@@ -170,6 +197,10 @@ export async function calendarRoutes(app: FastifyInstance) {
         currentEntry: result.currentEntry,
         updatedByName: result.updatedByName,
       });
+    }
+
+    if (!result.entry) {
+      return sendError(reply, 404, 'NOT_FOUND', 'Geen bronregeling gevonden.');
     }
 
     return { entry: result.entry };
