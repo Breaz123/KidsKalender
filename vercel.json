@@ -5,6 +5,10 @@
   "buildCommand": "npm run build -w @kids-calendar/shared && npm run build -w @kids-calendar/web",
   "outputDirectory": "apps/web/dist",
   "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://kalender.breaz-it.be/api/:path*"
+    },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

@@ -26,7 +26,7 @@ describe('LoginPage', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/e-mailadres/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/gebruikersnaam/i)).toBeInTheDocument();
     });
     expect(screen.getByLabelText(/wachtwoord/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /inloggen/i })).toBeInTheDocument();

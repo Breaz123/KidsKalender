@@ -16,12 +16,13 @@ import {
 import type { UserRole } from '@kids-calendar/shared';
 
 const SESSION_COOKIE = 'session';
+/** Standaard 90 dagen — inloggen blijft bewaard tot uitloggen of lange inactiviteit. */
 const SESSION_DURATION_HOURS = parseInt(
-  process.env.SESSION_DURATION_HOURS ?? '168',
+  process.env.SESSION_DURATION_HOURS ?? '2160',
   10,
 );
 
-export { SESSION_COOKIE };
+export { SESSION_COOKIE, SESSION_DURATION_HOURS };
 
 export async function authenticateUser(email: string, password: string) {
   const db = getDb();
@@ -111,6 +112,24 @@ export async function getSessionUser(token: string) {
     householdId: membership.householdId,
     householdName: membership.householdName,
   };
+}
+
+/** Verlengt de sessie in de database (sliding expiry bij app-gebruik). */
+export async function refreshSession(token: string) {
+  const db = getDb();
+  const tokenHash = hashSessionToken(token);
+  const expiresAt = getSessionExpiry(SESSION_DURATION_HOURS);
+
+  const [session] = await db
+    .update(sessions)
+    .set({
+      expiresAt,
+      lastUsedAt: new Date(),
+    })
+    .where(eq(sessions.tokenHash, tokenHash))
+    .returning();
+
+  return session ? expiresAt : null;
 }
 
 export async function destroySession(token: string) {
@@ -234,12 +253,14 @@ export async function updateHouseholdSettings(
 export function getCookieOptions() {
   const isProduction = process.env.NODE_ENV === 'production';
   const secure = process.env.COOKIE_SECURE === 'true' || isProduction;
+  const maxAge = SESSION_DURATION_HOURS * 60 * 60;
 
   return {
     httpOnly: true,
     secure,
     sameSite: 'lax' as const,
     path: '/',
-    maxAge: SESSION_DURATION_HOURS * 60 * 60,
+    maxAge,
+    expires: new Date(Date.now() + maxAge * 1000),
   };
 }

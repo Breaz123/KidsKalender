@@ -55,9 +55,8 @@ npm run db:migrate
 # 5. Testdata seeden (augustus 2026)
 npm run db:seed
 
-# 6. Gebruikers aanmaken
-npm run user:create -- --email papa@example.com --name "Papa"
-npm run user:create -- --email mama@example.com --name "Mama" --household <household-id>
+# 6. Ouderaccounts aanmaken (PASSWORD_PAPA / PASSWORD_MAMA in .env)
+npm run users:test
 
 # 7. Development servers starten
 npm run dev
@@ -83,7 +82,7 @@ Caddy regelt automatisch HTTPS zodra `DOMAIN` naar uw server wijst.
 | `POSTGRES_DB` | Databasenaam | `kidscalendar` |
 | `DATABASE_URL` | Volledige connection string | `postgresql://...` |
 | `SESSION_SECRET` | Geheim voor sessiecookies (min. 32 tekens) | `change_me...` |
-| `SESSION_DURATION_HOURS` | Sessieduur in uren | `168` |
+| `SESSION_DURATION_HOURS` | Sessieduur in uren (standaard 90 dagen) | `2160` |
 | `COOKIE_SECURE` | Secure-cookie (`true` in productie) | `false` |
 | `CORS_ORIGIN` | Toegestane frontend-origin | `http://localhost:5173` |
 | `DOMAIN` | Productiedomein voor Caddy | `kalender.example.com` |
@@ -107,7 +106,14 @@ Dit vult augustus 2026 met de vooraf gedefinieerde testdata.
 
 ## Gebruikers aanmaken
 
-Er is geen openbare registratie. Gebruikers worden aangemaakt via CLI:
+Er is geen openbare registratie. Ouderaccounts (Siemon / Trixie) vanuit `.env`:
+
+```bash
+# Zet PASSWORD_PAPA en PASSWORD_MAMA in .env
+npm run users:test
+```
+
+Extra gebruikers via CLI:
 
 ```bash
 npm run user:create -- --email gebruiker@example.com --name "Naam" --role parent

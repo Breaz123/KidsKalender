@@ -70,7 +70,11 @@ export const copyCalendarSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: z.string().email('Voer een geldig e-mailadres in.'),
+  email: z
+    .string()
+    .trim()
+    .min(1, 'Voer uw gebruikersnaam in.')
+    .max(255),
   password: z.string().min(1, 'Voer uw wachtwoord in.'),
 });
 

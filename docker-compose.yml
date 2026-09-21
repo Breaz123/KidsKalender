@@ -25,10 +25,12 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       SESSION_SECRET: ${SESSION_SECRET}
-      SESSION_DURATION_HOURS: ${SESSION_DURATION_HOURS:-168}
+      SESSION_DURATION_HOURS: ${SESSION_DURATION_HOURS:-2160}
       COOKIE_SECURE: 'true'
       CORS_ORIGIN: https://${DOMAIN}
       API_PORT: 3001
+      PASSWORD_PAPA: ${PASSWORD_PAPA}
+      PASSWORD_MAMA: ${PASSWORD_MAMA}
     depends_on:
       postgres:
         condition: service_healthy

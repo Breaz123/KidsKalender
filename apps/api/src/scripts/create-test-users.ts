@@ -1,13 +1,31 @@
 import '../env.js';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { getDb, closeDb } from '../db/index.js';
 import { users, households, householdMembers } from '../db/schema.js';
 import { createUser } from '../services/auth.service.js';
 import { hashPassword } from '../lib/crypto.js';
 
-const TEST_USERS = [
-  { email: 'papa@example.com', name: 'Papa', password: 'TestPassword123!' },
-  { email: 'mama@example.com', name: 'Mama', password: 'TestPassword123!' },
+function requireEnv(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`${name} ontbreekt in .env`);
+  }
+  return value;
+}
+
+const USERS = [
+  {
+    email: 'papa@kindjes',
+    legacyEmails: ['papa@example.com'],
+    name: 'Siemon',
+    password: requireEnv('PASSWORD_PAPA'),
+  },
+  {
+    email: 'mama@kindjes',
+    legacyEmails: ['mama@example.com'],
+    name: 'Trixie',
+    password: requireEnv('PASSWORD_MAMA'),
+  },
 ];
 
 async function main() {
@@ -19,18 +37,25 @@ async function main() {
     console.log('Huishouden aangemaakt:', household.id);
   }
 
-  for (const testUser of TEST_USERS) {
+  for (const user of USERS) {
+    const lookupEmails = [user.email, ...user.legacyEmails];
     const [existing] = await db
       .select()
       .from(users)
-      .where(eq(users.email, testUser.email))
+      .where(inArray(users.email, lookupEmails))
       .limit(1);
 
     if (existing) {
-      const passwordHash = await hashPassword(testUser.password);
+      const passwordHash = await hashPassword(user.password);
       await db
         .update(users)
-        .set({ passwordHash, isActive: true, updatedAt: new Date() })
+        .set({
+          email: user.email,
+          name: user.name,
+          passwordHash,
+          isActive: true,
+          updatedAt: new Date(),
+        })
         .where(eq(users.id, existing.id));
 
       const [membership] = await db
@@ -56,27 +81,27 @@ async function main() {
         });
       }
 
-      console.log(`Bijgewerkt: ${testUser.email}`);
+      console.log(`Bijgewerkt: ${user.name} (${user.email})`);
       continue;
     }
 
     await createUser(
-      testUser.email,
-      testUser.name,
-      testUser.password,
+      user.email,
+      user.name,
+      user.password,
       'parent',
       household.id,
     );
-    console.log(`Aangemaakt: ${testUser.email}`);
+    console.log(`Aangemaakt: ${user.name} (${user.email})`);
   }
 
-  console.log('\nTestgebruikers (zelfde huishouden):');
-  console.log('  papa@example.com / TestPassword123!');
-  console.log('  mama@example.com / TestPassword123!');
+  console.log('\nOuderaccounts (zelfde huishouden):');
+  console.log('  Siemon — papa@kindjes (PASSWORD_PAPA)');
+  console.log('  Trixie — mama@kindjes (PASSWORD_MAMA)');
   await closeDb();
 }
 
 main().catch((err) => {
-  console.error('Fout:', err.message);
+  console.error('Fout:', err instanceof Error ? err.stack ?? err.message : err);
   process.exit(1);
 });

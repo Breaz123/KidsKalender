@@ -9,6 +9,7 @@ import {
   authenticateUser,
   createSession,
   destroySession,
+  refreshSession,
   getCookieOptions,
   SESSION_COOKIE,
   changeUserPassword,
@@ -46,7 +47,7 @@ export async function authRoutes(app: FastifyInstance) {
         reply,
         401,
         'INVALID_CREDENTIALS',
-        'Onjuist e-mailadres of wachtwoord.',
+        'Onjuiste gebruikersnaam of wachtwoord.',
       );
     }
 
@@ -74,7 +75,12 @@ export async function authRoutes(app: FastifyInstance) {
     return { success: true };
   });
 
-  app.get('/me', { preHandler: requireAuth }, async (request) => {
+  app.get('/me', { preHandler: requireAuth }, async (request, reply) => {
+    const token = request.cookies[SESSION_COOKIE];
+    if (token) {
+      await refreshSession(token);
+      reply.setCookie(SESSION_COOKIE, token, getCookieOptions());
+    }
     return { user: request.user };
   });
 }

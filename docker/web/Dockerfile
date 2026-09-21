@@ -5,10 +5,11 @@ ENV VITE_API_URL=$VITE_API_URL
 COPY package.json package-lock.json* ./
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/web/package.json ./apps/web/
-RUN npm ci --workspace=@kids-calendar/shared --workspace=@kids-calendar/web --include-workspace-root
+RUN npm ci --workspace=@kids-calendar/shared --workspace=@kids-calendar/web --include-workspace-root --ignore-scripts
 COPY packages/shared ./packages/shared
 COPY apps/web ./apps/web
-RUN npm run build -w @kids-calendar/shared && npm run build -w @kids-calendar/web
+COPY scripts/generate-icons.js ./scripts/generate-icons.js
+RUN node scripts/generate-icons.js && npm run build -w @kids-calendar/shared && npm run build -w @kids-calendar/web
 
 FROM nginx:alpine
 COPY docker/web/nginx.conf /etc/nginx/conf.d/default.conf
