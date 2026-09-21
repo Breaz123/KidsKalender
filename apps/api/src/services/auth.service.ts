@@ -250,15 +250,31 @@ export async function updateHouseholdSettings(
   return household;
 }
 
+export type CookieSameSite = 'lax' | 'strict' | 'none';
+
+/** Safe default is `lax` (same-site / Caddy). Unknown values also fall back to `lax`. */
+export function resolveCookieSameSite(
+  raw: string | undefined = process.env.COOKIE_SAMESITE,
+): CookieSameSite {
+  const value = (raw ?? 'lax').trim().toLowerCase();
+  if (value === 'none' || value === 'strict' || value === 'lax') return value;
+  return 'lax';
+}
+
 export function getCookieOptions() {
   const isProduction = process.env.NODE_ENV === 'production';
-  const secure = process.env.COOKIE_SECURE === 'true' || isProduction;
+  const sameSite = resolveCookieSameSite();
+  // Browsers reject SameSite=None without Secure. Force Secure when none.
+  const secure =
+    sameSite === 'none' ||
+    process.env.COOKIE_SECURE === 'true' ||
+    isProduction;
   const maxAge = SESSION_DURATION_HOURS * 60 * 60;
 
   return {
     httpOnly: true,
     secure,
-    sameSite: 'lax' as const,
+    sameSite,
     path: '/',
     maxAge,
     expires: new Date(Date.now() + maxAge * 1000),

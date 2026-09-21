@@ -24,37 +24,53 @@ const calendarEntryBaseSchema = z.object({
   pickedUpByOther: z.string().max(100).nullable().optional(),
   note: z.string().max(500).nullable().optional(),
   version: z.number().int().positive().optional(),
+  isShared: z.boolean().optional().default(true),
+  title: z.string().max(200).nullable().optional(),
+  time: z.string().max(50).nullable().optional(),
+  id: z.string().uuid().optional(),
 });
 
 export const calendarEntryInputSchema = calendarEntryBaseSchema.superRefine(
   (data, ctx) => {
-    if (data.daytimeLocation === 'andere' && !data.daytimeLocationOther?.trim()) {
+    // Private entries require a title
+    if (data.isShared === false && !data.title?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Vul een locatie in bij "Andere".',
-        path: ['daytimeLocationOther'],
+        message: 'Titel is verplicht voor privé afspraken.',
+        path: ['title'],
       });
     }
-    if (data.activity === 'andere' && !data.activityOther?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Vul een activiteit in bij "Andere".',
-        path: ['activityOther'],
-      });
-    }
-    if (data.broughtBy === 'andere' && !data.broughtByOther?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Vul een naam in bij "Andere".',
-        path: ['broughtByOther'],
-      });
-    }
-    if (data.pickedUpBy === 'andere' && !data.pickedUpByOther?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Vul een naam in bij "Andere".',
-        path: ['pickedUpByOther'],
-      });
+    
+    // Shared entries validation
+    if (data.isShared !== false) {
+      if (data.daytimeLocation === 'andere' && !data.daytimeLocationOther?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Vul een locatie in bij "Andere".',
+          path: ['daytimeLocationOther'],
+        });
+      }
+      if (data.activity === 'andere' && !data.activityOther?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Vul een activiteit in bij "Andere".',
+          path: ['activityOther'],
+        });
+      }
+      if (data.broughtBy === 'andere' && !data.broughtByOther?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Vul een naam in bij "Andere".',
+          path: ['broughtByOther'],
+        });
+      }
+      if (data.pickedUpBy === 'andere' && !data.pickedUpByOther?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Vul een naam in bij "Andere".',
+          path: ['pickedUpByOther'],
+        });
+      }
     }
   },
 );
@@ -105,6 +121,9 @@ export const importJsonSchema = z.object({
       pickedUpBy: personSchema.optional(),
       pickedUpByOther: z.string().nullable().optional(),
       note: z.string().nullable().optional(),
+      isShared: z.boolean().optional().default(true),
+      title: z.string().max(200).nullable().optional(),
+      time: z.string().max(50).nullable().optional(),
     }),
   ),
 });

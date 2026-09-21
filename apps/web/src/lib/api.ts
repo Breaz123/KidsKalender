@@ -58,13 +58,18 @@ export const api = {
 
   me: () => request<{ user: AuthUser }>('/api/auth/me'),
 
+  getToday: () => request<{ today: string }>('/api/calendar/today'),
+
   getCalendar: (year: number, month: number) =>
     request<{ entries: CalendarEntry[] }>(
       `/api/calendar?year=${year}&month=${month}`,
     ),
 
   getEntry: (date: string) =>
-    request<{ entry: CalendarEntry }>(`/api/calendar/${date}`),
+    request<{ entry: CalendarEntry; entries: CalendarEntry[] }>(`/api/calendar/${date}`),
+
+  getEntriesForDate: (date: string) =>
+    request<{ entries: CalendarEntry[] }>(`/api/calendar/${date}/all`),
 
   upsertEntry: (date: string, data: CalendarEntryInput) =>
     request<{ entry: CalendarEntry }>(`/api/calendar/${date}`, {
@@ -72,10 +77,11 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  deleteEntry: (date: string) =>
-    request<{ success: boolean }>(`/api/calendar/${date}`, {
-      method: 'DELETE',
-    }),
+  deleteEntry: (date: string, id?: string) =>
+    request<{ success: boolean }>(
+      `/api/calendar/${date}${id ? `?id=${encodeURIComponent(id)}` : ''}`,
+      { method: 'DELETE' },
+    ),
 
   bulkEntries: (startDate: string, endDate: string, entry: CalendarEntryInput) =>
     request<{ results: Array<{ date: string; entry: CalendarEntry | null }> }>(

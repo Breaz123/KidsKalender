@@ -11,6 +11,7 @@ import {
   primaryKey,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -76,6 +77,10 @@ export const calendarEntries = pgTable(
     pickedUpBy: varchar('picked_up_by', { length: 50 }),
     pickedUpByOther: varchar('picked_up_by_other', { length: 100 }),
     note: text('note'),
+    isShared: boolean('is_shared').notNull().default(true),
+    ownerId: uuid('owner_id').references(() => users.id),
+    title: varchar('title', { length: 200 }),
+    time: varchar('time', { length: 50 }),
     createdBy: uuid('created_by')
       .notNull()
       .references(() => users.id),
@@ -87,10 +92,9 @@ export const calendarEntries = pgTable(
     version: integer('version').notNull().default(1),
   },
   (table) => [
-    uniqueIndex('calendar_entries_household_date_idx').on(
-      table.householdId,
-      table.date,
-    ),
+    uniqueIndex('calendar_entries_household_date_shared_idx')
+      .on(table.householdId, table.date)
+      .where(sql`${table.isShared} = true`),
   ],
 );
 
