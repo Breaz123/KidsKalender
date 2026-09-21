@@ -78,7 +78,9 @@ export const calendarEntryInputSchema = calendarEntryBaseSchema.superRefine(
 export const bulkCalendarSchema = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  entry: calendarEntryBaseSchema.omit({ version: true }),
+  /** daily = elke dag; weekly = elke week; biweekly = elke 2 weken (zelfde weekdag) */
+  frequency: z.enum(['daily', 'weekly', 'biweekly']).default('daily'),
+  entry: calendarEntryBaseSchema.omit({ version: true, id: true }),
 });
 
 export const copyCalendarSchema = z.object({

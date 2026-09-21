@@ -20,6 +20,7 @@
     "db:seed": "npm run db:seed -w @kids-calendar/api",
     "user:create": "npm run user:create -w @kids-calendar/api",
     "users:test": "npm run users:test -w @kids-calendar/api",
+    "cleanup:empty-private": "npm run cleanup:empty-private -w @kids-calendar/api --",
     "backup": "node scripts/backup.js",
     "restore": "node scripts/restore.js",
     "icons": "node scripts/generate-icons.js",

@@ -100,11 +100,13 @@ export function useBulkEntries() {
       startDate,
       endDate,
       entry,
+      frequency = 'daily',
     }: {
       startDate: string;
       endDate: string;
       entry: CalendarEntryInput;
-    }) => api.bulkEntries(startDate, endDate, entry),
+      frequency?: 'daily' | 'weekly' | 'biweekly';
+    }) => api.bulkEntries(startDate, endDate, entry, frequency),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['calendar'] });
       qc.invalidateQueries({ queryKey: ['calendar-day'] });

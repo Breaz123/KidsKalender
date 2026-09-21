@@ -59,10 +59,15 @@ export function OverviewPage() {
   const handleSave = async (
     date: string,
     formData: CalendarEntryInput,
-    options?: { bulk?: boolean; endDate?: string },
+    options?: { bulk?: boolean; endDate?: string; frequency?: 'daily' | 'weekly' | 'biweekly' },
   ) => {
     if (options?.bulk && options.endDate) {
-      await bulk.mutateAsync({ startDate: date, endDate: options.endDate, entry: formData });
+      await bulk.mutateAsync({
+        startDate: date,
+        endDate: options.endDate,
+        entry: formData,
+        frequency: options.frequency ?? 'daily',
+      });
     } else {
       await upsert.mutateAsync({ date, data: formData });
     }
@@ -250,6 +255,8 @@ export function OverviewPage() {
       <EntryForm
         open={showForm}
         onClose={() => setShowForm(false)}
+        defaultShared
+        lockVisibility
         onSave={handleSave}
       />
     </div>

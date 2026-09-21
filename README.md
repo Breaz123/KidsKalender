@@ -130,6 +130,21 @@ Voor de tweede ouder, gebruik het `household`-id van de eerste gebruiker:
 npm run user:create -- --email ouder2@example.com --name "Ouder 2" --household <uuid>
 ```
 
+## Lege privé-bulk opruimen
+
+Als een maand vol staat met lege “Privé afspraak”-cellen (zonder titel), ruim ze zo op tegen de database in `.env`:
+
+```bash
+# Eerst bekijken
+npm run cleanup:empty-private -- --year=2026 --month=9 --dry-run
+
+# Dan verwijderen (alleen privé zonder titel; getitelde privé en gedeelde regeling blijven)
+npm run cleanup:empty-private -- --year=2026 --month=9
+
+# Optioneel beperken tot één ouder
+npm run cleanup:empty-private -- --year=2026 --month=9 --email=papa@kindjes
+```
+
 ## Productie deployen
 
 1. Server voorbereiden met Docker

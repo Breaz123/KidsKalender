@@ -61,9 +61,12 @@ beforeAll(async () => {
   for (const email of [PAPA_EMAIL, MAMA_EMAIL]) {
     const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1);
     if (existing) {
-      await db.delete(sessions).where(eq(sessions.userId, existing.id));
-      await db.delete(householdMembers).where(eq(householdMembers.userId, existing.id));
       await db.delete(auditLogs).where(eq(auditLogs.userId, existing.id));
+      await db.delete(sessions).where(eq(sessions.userId, existing.id));
+      await db.execute(
+        sql`DELETE FROM calendar_entries WHERE created_by = ${existing.id} OR updated_by = ${existing.id} OR owner_id = ${existing.id}`,
+      );
+      await db.delete(householdMembers).where(eq(householdMembers.userId, existing.id));
       await db.delete(users).where(eq(users.id, existing.id));
     }
   }
@@ -494,10 +497,9 @@ describe('Privacy: History and Audit Logs', () => {
 });
 
 describe('Privacy: Bulk Operations', () => {
-  it('bulk operation respects privacy settings', async () => {
+  it('rejects bulk create for private entries', async () => {
     if (!requireDb()) return;
 
-    // Papa creates bulk private entries
     const res = await app.inject({
       method: 'POST',
       url: '/api/calendar/bulk',
@@ -512,38 +514,126 @@ describe('Privacy: Bulk Operations', () => {
         },
       },
     });
-    expect(res.statusCode).toBe(200);
-    expect(res.json().results).toHaveLength(3);
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.code).toBe('VALIDATION_ERROR');
 
-    // Mama should not see any of these entries
-    const mamaMonthRes = await app.inject({
-      method: 'GET',
-      url: '/api/calendar?year=2026&month=9',
-      cookies: { session: mamaCookie },
-    });
-    expect(mamaMonthRes.statusCode).toBe(200);
-    const entries = mamaMonthRes.json().entries;
-    
-    const papaBulkEntries = entries.filter((e: { date: string; note?: string }) => 
-      e.note === 'Papa bulk private' &&
-      ['2026-09-26', '2026-09-27', '2026-09-28'].includes(e.date)
-    );
-    expect(papaBulkEntries).toHaveLength(0);
-
-    // Papa should see all three
     const papaMonthRes = await app.inject({
       method: 'GET',
       url: '/api/calendar?year=2026&month=9',
       cookies: { session: papaCookie },
     });
     expect(papaMonthRes.statusCode).toBe(200);
-    const papaEntries = papaMonthRes.json().entries;
-    
-    const papaBulk = papaEntries.filter((e: { date: string; note?: string }) => 
-      e.note === 'Papa bulk private' &&
-      ['2026-09-26', '2026-09-27', '2026-09-28'].includes(e.date)
+    const papaBulk = papaMonthRes.json().entries.filter(
+      (e: { date: string; note?: string }) =>
+        e.note === 'Papa bulk private' &&
+        ['2026-09-26', '2026-09-27', '2026-09-28'].includes(e.date),
     );
-    expect(papaBulk).toHaveLength(3);
+    expect(papaBulk).toHaveLength(0);
+  });
+
+  it('weekly bulk only creates matching weekdays', async () => {
+    if (!requireDb()) return;
+
+    // 2026-10-05 is a Monday; until 2026-10-26 → 4 Mondays
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/calendar/bulk',
+      cookies: { session: papaCookie },
+      payload: {
+        startDate: '2026-10-05',
+        endDate: '2026-10-26',
+        frequency: 'weekly',
+        entry: {
+          daytimeLocation: 'papa',
+          sleepLocation: 'papa',
+          note: 'Weekly monday test',
+          isShared: true,
+        },
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().results).toHaveLength(4);
+    expect(res.json().results.map((r: { date: string }) => r.date)).toEqual([
+      '2026-10-05',
+      '2026-10-12',
+      '2026-10-19',
+      '2026-10-26',
+    ]);
+  });
+
+  it('biweekly bulk creates every other matching weekday', async () => {
+    if (!requireDb()) return;
+
+    // 2026-10-05 is a Monday; until 2026-10-26 → Mondays every 2 weeks = 2 dates
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/calendar/bulk',
+      cookies: { session: papaCookie },
+      payload: {
+        startDate: '2026-10-05',
+        endDate: '2026-10-26',
+        frequency: 'biweekly',
+        entry: {
+          daytimeLocation: 'papa',
+          sleepLocation: 'papa',
+          note: 'Biweekly monday test',
+          isShared: true,
+        },
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().results).toHaveLength(2);
+    expect(res.json().results.map((r: { date: string }) => r.date)).toEqual([
+      '2026-10-05',
+      '2026-10-19',
+    ]);
+  });
+
+  it('weekly bulk from edit still creates other weekdays when entry id is sent', async () => {
+    if (!requireDb()) return;
+
+    // Create a Tuesday entry first
+    const createRes = await app.inject({
+      method: 'PUT',
+      url: '/api/calendar/2026-10-06',
+      cookies: { session: papaCookie },
+      payload: {
+        daytimeLocation: 'mama',
+        sleepLocation: 'mama',
+        note: 'Edit then bulk',
+        isShared: true,
+      },
+    });
+    expect(createRes.statusCode).toBe(200);
+    const entryId = createRes.json().entry.id as string;
+
+    // Bulk weekly with the source entry id (bug: used to skip other dates)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/calendar/bulk',
+      cookies: { session: papaCookie },
+      payload: {
+        startDate: '2026-10-06',
+        endDate: '2026-10-27',
+        frequency: 'weekly',
+        entry: {
+          id: entryId,
+          daytimeLocation: 'mama',
+          sleepLocation: 'mama',
+          note: 'Edit then bulk',
+          isShared: true,
+        },
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const dates = res.json().results.map((r: { date: string; entry: unknown }) => r.date);
+    expect(dates).toEqual([
+      '2026-10-06',
+      '2026-10-13',
+      '2026-10-20',
+      '2026-10-27',
+    ]);
+    expect(res.json().results.every((r: { entry: unknown }) => r.entry != null)).toBe(true);
   });
 });
 

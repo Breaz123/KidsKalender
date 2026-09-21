@@ -184,6 +184,17 @@ describe('Multi-entry grouping', () => {
     expect(shared?.id).toBe('s');
     expect(privates).toHaveLength(2);
   });
+
+  it('filtert gedeelde vs privé-agenda', async () => {
+    const { filterEntriesForAgenda } = await import('../lib/entries');
+    const entries = [
+      { id: 's', isShared: true, date: '2026-09-20' },
+      { id: 'p', isShared: false, date: '2026-09-20' },
+    ] as import('@kids-calendar/shared').CalendarEntry[];
+
+    expect(filterEntriesForAgenda(entries, 'shared').map((e) => e.id)).toEqual(['s']);
+    expect(filterEntriesForAgenda(entries, 'mine').map((e) => e.id)).toEqual(['p']);
+  });
 });
 
 describe('Color fallback', () => {

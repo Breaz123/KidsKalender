@@ -153,12 +153,22 @@ export function DayCard({ entry, date, size = 'large' }: DayCardProps) {
             />
             <div>
               <p className="text-xs font-medium uppercase tracking-wide opacity-70">Brengen</p>
-              <p className={isLarge ? 'text-base' : 'text-sm'}>
-                {getPersonLabelFromSettings(
-                  entry.broughtBy,
-                  entry.broughtByOther,
-                  displaySettings,
-                )}
+              <p className={isLarge ? 'text-base font-semibold' : 'text-sm font-semibold'}>
+                {entry.activity
+                  ? `${getPersonLabelFromSettings(
+                      entry.broughtBy,
+                      entry.broughtByOther,
+                      displaySettings,
+                    )} ${getActivityLabelFromSettings(
+                      entry.activity,
+                      entry.activityOther,
+                      displaySettings,
+                    ).toLowerCase()} brengen`
+                  : `${getPersonLabelFromSettings(
+                      entry.broughtBy,
+                      entry.broughtByOther,
+                      displaySettings,
+                    )} brengt`}
               </p>
             </div>
           </div>
@@ -172,12 +182,13 @@ export function DayCard({ entry, date, size = 'large' }: DayCardProps) {
             />
             <div>
               <p className="text-xs font-medium uppercase tracking-wide opacity-70">Ophalen</p>
-              <p className={isLarge ? 'text-base' : 'text-sm'}>
+              <p className={isLarge ? 'text-base font-semibold' : 'text-sm font-semibold'}>
                 {getPersonLabelFromSettings(
                   entry.pickedUpBy,
                   entry.pickedUpByOther,
                   displaySettings,
-                )}
+                )}{' '}
+                haalt op
               </p>
             </div>
           </div>

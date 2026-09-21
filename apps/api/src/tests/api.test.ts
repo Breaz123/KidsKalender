@@ -58,9 +58,12 @@ beforeAll(async () => {
   for (const email of [TEST_EMAIL, OTHER_EMAIL]) {
     const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1);
     if (existing) {
-      await db.delete(sessions).where(eq(sessions.userId, existing.id));
-      await db.delete(householdMembers).where(eq(householdMembers.userId, existing.id));
       await db.delete(auditLogs).where(eq(auditLogs.userId, existing.id));
+      await db.delete(sessions).where(eq(sessions.userId, existing.id));
+      await db.execute(
+        sql`DELETE FROM calendar_entries WHERE created_by = ${existing.id} OR updated_by = ${existing.id} OR owner_id = ${existing.id}`,
+      );
+      await db.delete(householdMembers).where(eq(householdMembers.userId, existing.id));
       await db.delete(users).where(eq(users.id, existing.id));
     }
   }
@@ -157,6 +160,14 @@ describe('Calendar', () => {
 
   it('kalenderitem wijzigen', async () => {
     if (!requireDb()) return;
+    const current = await app.inject({
+      method: 'GET',
+      url: '/api/calendar/2026-08-04',
+      cookies: { session: sessionCookie },
+    });
+    expect(current.statusCode).toBe(200);
+    const version = current.json().entry.version as number;
+
     const res = await app.inject({
       method: 'PUT',
       url: '/api/calendar/2026-08-04',
@@ -166,12 +177,12 @@ describe('Calendar', () => {
         sleepLocation: 'papa',
         pickedUpBy: 'trixie',
         isShared: true,
-        version: 1,
+        version,
       },
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().entry.sleepLocation).toBe('papa');
-    expect(res.json().entry.version).toBe(2);
+    expect(res.json().entry.version).toBe(version + 1);
   });
 
   it('versieconflict geeft HTTP 409', async () => {

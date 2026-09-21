@@ -8,24 +8,42 @@ import {
   addMonths,
   subMonths,
   parseISO,
+  addDays,
+  format as fmt,
 } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, Lock } from 'lucide-react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useCalendarMonth, useUpsertEntry, useBulkEntries, useToday } from '../hooks/useCalendar';
 import { DayCell } from '../components/DayCell';
 import { EntryForm } from '../components/EntryForm';
 import { EmptyState } from '../components/EmptyState';
 import { CalendarGridSkeleton } from '../components/Skeleton';
-import { groupEntriesByDate } from '../lib/entries';
+import {
+  filterEntriesForAgenda,
+  groupEntriesByDate,
+  type AgendaMode,
+} from '../lib/entries';
 import type { CalendarEntryInput } from '@kids-calendar/shared';
-import { addDays, format as fmt } from 'date-fns';
+import { cn } from '../lib/cn';
 
 const WEEKDAYS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
 
+function dateFromSearch(params: URLSearchParams, fallback: Date): Date {
+  const y = parseInt(params.get('y') ?? '', 10);
+  const m = parseInt(params.get('m') ?? '', 10);
+  if (!Number.isNaN(y) && !Number.isNaN(m) && m >= 1 && m <= 12) {
+    return new Date(y, m - 1, 1);
+  }
+  return fallback;
+}
+
 export function CalendarPage() {
   const navigate = useNavigate();
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const agendaMode: AgendaMode = location.pathname.startsWith('/mijn') ? 'mine' : 'shared';
+  const [currentDate, setCurrentDate] = useState(() => dateFromSearch(searchParams, new Date()));
   const [showForm, setShowForm] = useState(false);
   const [formDate, setFormDate] = useState<string>();
   const [focusDate, setFocusDate] = useState<string | null>(null);
@@ -35,12 +53,35 @@ export function CalendarPage() {
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
+  const monthQuery = `?y=${year}&m=${month}`;
+
+  useEffect(() => {
+    const next = new URLSearchParams();
+    next.set('y', String(year));
+    next.set('m', String(month));
+    if (searchParams.get('y') === String(year) && searchParams.get('m') === String(month)) {
+      return;
+    }
+    setSearchParams(next, { replace: true });
+  }, [year, month, searchParams, setSearchParams]);
 
   const { data: entries = [], isLoading, isError, error } = useCalendarMonth(year, month);
   const upsert = useUpsertEntry();
   const bulk = useBulkEntries();
 
-  const entriesByDate = useMemo(() => groupEntriesByDate(entries), [entries]);
+  const visibleEntries = useMemo(
+    () => filterEntriesForAgenda(entries, agendaMode),
+    [entries, agendaMode],
+  );
+  const entriesByDate = useMemo(() => groupEntriesByDate(visibleEntries), [visibleEntries]);
+  const privateCountByDate = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of entries) {
+      if (e.isShared) continue;
+      map.set(e.date, (map.get(e.date) ?? 0) + 1);
+    }
+    return map;
+  }, [entries]);
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -64,18 +105,34 @@ export function CalendarPage() {
   const handleSave = async (
     date: string,
     data: CalendarEntryInput,
-    options?: { nextDay?: boolean; bulk?: boolean; endDate?: string },
+    options?: {
+      nextDay?: boolean;
+      bulk?: boolean;
+      endDate?: string;
+      frequency?: 'daily' | 'weekly' | 'biweekly';
+    },
   ) => {
     if (options?.bulk && options.endDate) {
-      await bulk.mutateAsync({ startDate: date, endDate: options.endDate, entry: data });
-    } else {
-      await upsert.mutateAsync({ date, data });
-      if (options?.nextDay) {
-        const next = fmt(addDays(parseISO(date), 1), 'yyyy-MM-dd');
-        setFormDate(next);
-        return;
-      }
+      await bulk.mutateAsync({
+        startDate: date,
+        endDate: options.endDate,
+        entry: data,
+        frequency: options.frequency ?? 'daily',
+      });
+      setShowForm(false);
+      return;
     }
+
+    await upsert.mutateAsync({ date, data });
+    if (options?.nextDay) {
+      const next = fmt(addDays(parseISO(date), 1), 'yyyy-MM-dd');
+      setFormDate(next);
+      return;
+    }
+    setShowForm(false);
+    navigate(`/dag/${date}`, {
+      state: { from: agendaMode === 'mine' ? '/mijn' : '/' },
+    });
   };
 
   const moveFocus = (delta: number) => {
@@ -129,6 +186,40 @@ export function CalendarPage() {
   return (
     <div className="pb-24">
       <header className="sticky top-[var(--app-sticky-offset,0px)] z-10 border-b border-gray-200 bg-white px-4 py-3">
+        <div
+          className="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-gray-100 p-1"
+          role="tablist"
+          aria-label="Agenda"
+        >
+          <Link
+            to={`/${monthQuery}`}
+            role="tab"
+            aria-selected={agendaMode === 'shared'}
+            className={cn(
+              'rounded-lg px-3 py-2.5 text-center text-sm font-semibold transition-colors',
+              agendaMode === 'shared'
+                ? 'bg-white text-blue-700 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900',
+            )}
+          >
+            Gedeeld
+          </Link>
+          <Link
+            to={`/mijn${monthQuery}`}
+            role="tab"
+            aria-selected={agendaMode === 'mine'}
+            className={cn(
+              'inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-center text-sm font-semibold transition-colors',
+              agendaMode === 'mine'
+                ? 'bg-white text-purple-700 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900',
+            )}
+          >
+            <Lock className="h-3.5 w-3.5" aria-hidden />
+            Privé
+          </Link>
+        </div>
+
         <div className="flex items-center justify-between">
           <button
             type="button"
@@ -199,6 +290,17 @@ export function CalendarPage() {
             ))}
           </select>
         </div>
+
+        {agendaMode === 'mine' && (
+          <p className="mt-2 text-center text-xs text-purple-700">
+            Alleen jouw privé-afspraken — de andere ouder ziet deze niet.
+          </p>
+        )}
+        {agendaMode === 'shared' && (
+          <p className="mt-2 text-center text-xs text-gray-500">
+            Alleen de gedeelde kinderregeling. Paars slotje = ook privé — tik op de dag.
+          </p>
+        )}
       </header>
 
       <div className="p-2 sm:p-4">
@@ -223,7 +325,11 @@ export function CalendarPage() {
             ) : (
               <div
                 role="grid"
-                aria-label={`Kalender ${format(currentDate, 'MMMM yyyy', { locale: nl })}`}
+                aria-label={
+                  agendaMode === 'mine'
+                    ? `Privé agenda ${format(currentDate, 'MMMM yyyy', { locale: nl })}`
+                    : `Gedeelde kalender ${format(currentDate, 'MMMM yyyy', { locale: nl })}`
+                }
                 onKeyDown={handleGridKeyDown}
                 className="grid grid-cols-7 gap-1"
               >
@@ -244,8 +350,16 @@ export function CalendarPage() {
                         date={day}
                         entries={entriesByDate.get(dateStr) ?? []}
                         isToday={isTodayDate}
+                        showPrivate={agendaMode === 'mine'}
+                        privateHintCount={
+                          agendaMode === 'shared' ? (privateCountByDate.get(dateStr) ?? 0) : 0
+                        }
                         tabIndex={focusDate === dateStr ? 0 : -1}
-                        onClick={() => navigate(`/dag/${dateStr}`)}
+                        onClick={() =>
+                          navigate(`/dag/${dateStr}`, {
+                            state: { from: agendaMode === 'mine' ? '/mijn' : '/' },
+                          })
+                        }
                       />
                     </div>
                   );
@@ -253,11 +367,25 @@ export function CalendarPage() {
               </div>
             )}
 
-            {!isLoading && entries.length === 0 && (
+            {!isLoading && agendaMode === 'shared' && !visibleEntries.some((e) => e.isShared) && (
               <div className="mt-6">
                 <EmptyState
-                  title="Geen regelingen deze maand"
-                  description="Tik op + Regeling om te beginnen."
+                  title="Nog geen kinderregeling deze maand"
+                  description="Tik op een dag of voeg hier een gedeelde regeling toe. Privé staat onder Mijn agenda."
+                  onAction={() => {
+                    setFormDate(todayStr);
+                    setShowForm(true);
+                  }}
+                />
+              </div>
+            )}
+
+            {!isLoading && agendaMode === 'mine' && visibleEntries.length === 0 && (
+              <div className="mt-6">
+                <EmptyState
+                  title="Nog geen privé-afspraken"
+                  description="Voeg een persoonlijke afspraak toe — de andere ouder ziet die niet."
+                  actionLabel="Privé afspraak toevoegen"
                   onAction={() => {
                     setFormDate(todayStr);
                     setShowForm(true);
@@ -273,6 +401,8 @@ export function CalendarPage() {
         open={showForm}
         onClose={() => setShowForm(false)}
         initialDate={formDate}
+        defaultShared={agendaMode === 'shared'}
+        lockVisibility
         onSave={handleSave}
       />
     </div>
@@ -287,10 +417,20 @@ export function useCalendarAddForm() {
   const handleSave = async (
     date: string,
     data: CalendarEntryInput,
-    options?: { nextDay?: boolean; bulk?: boolean; endDate?: string },
+    options?: {
+      nextDay?: boolean;
+      bulk?: boolean;
+      endDate?: string;
+      frequency?: 'daily' | 'weekly' | 'biweekly';
+    },
   ) => {
     if (options?.bulk && options.endDate) {
-      await bulk.mutateAsync({ startDate: date, endDate: options.endDate, entry: data });
+      await bulk.mutateAsync({
+        startDate: date,
+        endDate: options.endDate,
+        entry: data,
+        frequency: options.frequency ?? 'daily',
+      });
     } else {
       await upsert.mutateAsync({ date, data });
     }

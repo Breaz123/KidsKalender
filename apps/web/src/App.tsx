@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import { useOnline } from './contexts/OnlineContext';
 import { BottomNav } from './components/BottomNav';
@@ -18,20 +18,33 @@ import { WifiOff } from 'lucide-react';
 function AppLayout() {
   const { user, loading } = useAuth();
   const { isOnline } = useOnline();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
   const upsert = useUpsertEntry();
   const bulk = useBulkEntries();
+  const fabShared = !location.pathname.startsWith('/mijn');
 
   const handleSave = async (
     date: string,
     data: CalendarEntryInput,
-    options?: { bulk?: boolean; endDate?: string },
+    options?: { bulk?: boolean; endDate?: string; frequency?: 'daily' | 'weekly' | 'biweekly' },
   ) => {
     if (options?.bulk && options.endDate) {
-      await bulk.mutateAsync({ startDate: date, endDate: options.endDate, entry: data });
-    } else {
-      await upsert.mutateAsync({ date, data });
+      await bulk.mutateAsync({
+        startDate: date,
+        endDate: options.endDate,
+        entry: data,
+        frequency: options.frequency ?? 'daily',
+      });
+      setShowForm(false);
+      return;
     }
+    await upsert.mutateAsync({ date, data });
+    setShowForm(false);
+    navigate(`/dag/${date}`, {
+      state: { from: fabShared ? '/' : '/mijn' },
+    });
   };
 
   if (loading) {
@@ -63,6 +76,7 @@ function AppLayout() {
         <main>
           <Routes>
             <Route path="/" element={<CalendarPage />} />
+            <Route path="/mijn" element={<CalendarPage />} />
             <Route path="/vandaag" element={<TodayPage />} />
             <Route path="/overzicht" element={<OverviewPage />} />
             <Route path="/instellingen" element={<SettingsPage />} />
@@ -75,6 +89,8 @@ function AppLayout() {
         <EntryForm
           open={showForm}
           onClose={() => setShowForm(false)}
+          defaultShared={fabShared}
+          lockVisibility
           onSave={handleSave}
         />
       </div>

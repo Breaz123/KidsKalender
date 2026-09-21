@@ -6,7 +6,7 @@ import {
   importJsonSchema,
 } from '@kids-calendar/shared';
 import { requireAuth } from '../middleware/auth.js';
-import { sendError, getDatesInRange } from '../lib/utils.js';
+import { sendError, getDatesInRange, getWeeklyDatesInRange, getBiweeklyDatesInRange } from '../lib/utils.js';
 import {
   getEntryByDate,
   getAllEntriesForDate,
@@ -130,12 +130,14 @@ export async function calendarRoutes(app: FastifyInstance) {
     }
 
     const { id } = request.query as { id?: string };
+    const entryId =
+      id && /^[0-9a-f-]{36}$/i.test(id) ? id : undefined;
 
     const deleted = await deleteEntry(
       request.user!.householdId,
       date,
       request.user!.id,
-      id,
+      entryId,
     );
 
     if (!deleted) {
@@ -157,7 +159,41 @@ export async function calendarRoutes(app: FastifyInstance) {
       );
     }
 
-    const dates = getDatesInRange(parsed.data.startDate, parsed.data.endDate);
+    // Privé blijft single-day: multi-day bulk is alleen voor gedeelde kinderregeling.
+    if (parsed.data.entry.isShared === false) {
+      return sendError(
+        reply,
+        400,
+        'VALIDATION_ERROR',
+        'Privé afspraken kunnen niet over meerdere dagen tegelijk worden aangemaakt.',
+      );
+    }
+
+    const dates =
+      parsed.data.frequency === 'weekly'
+        ? getWeeklyDatesInRange(parsed.data.startDate, parsed.data.endDate)
+        : parsed.data.frequency === 'biweekly'
+          ? getBiweeklyDatesInRange(parsed.data.startDate, parsed.data.endDate)
+          : getDatesInRange(parsed.data.startDate, parsed.data.endDate);
+
+    if (dates.length === 0) {
+      return sendError(
+        reply,
+        400,
+        'VALIDATION_ERROR',
+        'Geen dagen in deze periode. Controleer start- en einddatum.',
+      );
+    }
+
+    if (dates.length > 366) {
+      return sendError(
+        reply,
+        400,
+        'VALIDATION_ERROR',
+        'Periode is te lang (max. 366 dagen). Kies een kortere einddatum.',
+      );
+    }
+
     const results = await bulkUpsertEntries(
       request.user!.householdId,
       dates,
@@ -210,6 +246,15 @@ export async function calendarRoutes(app: FastifyInstance) {
     const { date } = request.params as { date: string };
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return sendError(reply, 400, 'VALIDATION_ERROR', 'Ongeldige datum.');
+    }
+
+    const visible = await getEntryByDate(
+      request.user!.householdId,
+      date,
+      request.user!.id,
+    );
+    if (!visible) {
+      return sendError(reply, 404, 'NOT_FOUND', 'Geen regeling gevonden voor deze dag.');
     }
 
     const history = await getEntryHistory(request.user!.householdId, date, request.user!.id);

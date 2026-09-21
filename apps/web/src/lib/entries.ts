@@ -1,5 +1,7 @@
 import type { CalendarEntry } from '@kids-calendar/shared';
 
+export type AgendaMode = 'shared' | 'mine';
+
 /** Group every visible entry by date. Never overwrite layers with Map.set(date, one). */
 export function groupEntriesByDate(entries: CalendarEntry[]): Map<string, CalendarEntry[]> {
   const map = new Map<string, CalendarEntry[]>();
@@ -17,4 +19,13 @@ export function splitDayEntries(entries: CalendarEntry[] | undefined) {
     shared: list.find((e) => e.isShared) ?? null,
     privates: list.filter((e) => !e.isShared),
   };
+}
+
+/** Gedeeld = alleen kinderregeling; Privé = alleen eigen privé-afspraken. */
+export function filterEntriesForAgenda(
+  entries: CalendarEntry[],
+  mode: AgendaMode,
+): CalendarEntry[] {
+  if (mode === 'shared') return entries.filter((e) => e.isShared);
+  return entries.filter((e) => !e.isShared);
 }

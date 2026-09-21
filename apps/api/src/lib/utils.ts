@@ -80,3 +80,34 @@ export function getDatesInRange(startDate: string, endDate: string): string[] {
   }
   return dates;
 }
+
+/** Zelfde weekdag als startDate, tot en met endDate (inclusief). */
+export function getWeeklyDatesInRange(startDate: string, endDate: string): string[] {
+  const dates: string[] = [];
+  const current = new Date(startDate + 'T12:00:00');
+  const end = new Date(endDate + 'T12:00:00');
+  if (current > end) return dates;
+
+  const weekday = current.getDay();
+  while (current <= end) {
+    if (current.getDay() === weekday) {
+      dates.push(current.toISOString().slice(0, 10));
+    }
+    current.setDate(current.getDate() + 1);
+  }
+  return dates;
+}
+
+/** Elke 2 weken vanaf startDate (zelfde weekdag), tot en met endDate. */
+export function getBiweeklyDatesInRange(startDate: string, endDate: string): string[] {
+  const dates: string[] = [];
+  const current = new Date(startDate + 'T12:00:00');
+  const end = new Date(endDate + 'T12:00:00');
+  if (current > end) return dates;
+
+  while (current <= end) {
+    dates.push(current.toISOString().slice(0, 10));
+    current.setDate(current.getDate() + 14);
+  }
+  return dates;
+}

@@ -105,10 +105,15 @@ export function TodayPage() {
   const handleSave = async (
     date: string,
     data: CalendarEntryInput,
-    options?: { nextDay?: boolean; bulk?: boolean; endDate?: string },
+    options?: { nextDay?: boolean; bulk?: boolean; endDate?: string; frequency?: 'daily' | 'weekly' | 'biweekly' },
   ) => {
     if (options?.bulk && options.endDate) {
-      await bulk.mutateAsync({ startDate: date, endDate: options.endDate, entry: data });
+      await bulk.mutateAsync({
+        startDate: date,
+        endDate: options.endDate,
+        entry: data,
+        frequency: options.frequency ?? 'daily',
+      });
     } else {
       await upsert.mutateAsync({ date, data });
     }
@@ -168,6 +173,7 @@ export function TodayPage() {
         onClose={() => setShowForm(false)}
         initialDate={formDate}
         defaultShared={formShared}
+        lockVisibility
         onSave={handleSave}
       />
     </div>

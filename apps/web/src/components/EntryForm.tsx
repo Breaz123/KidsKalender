@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { format, addDays, parseISO, differenceInCalendarDays } from 'date-fns';
+import { format, addDays, parseISO } from 'date-fns';
+import { nl } from 'date-fns/locale';
 import {
   ACTIVITIES,
   DAYTIME_LOCATIONS,
@@ -14,6 +15,17 @@ import { Modal } from './Modal';
 import { useOnline } from '../contexts/OnlineContext';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { ApiClientError } from '../lib/api';
+import { getDatesInRange, getWeeklyDatesInRange, getBiweeklyDatesInRange, type BulkFrequency } from '../lib/dates';
+
+export type EntrySaveOptions = {
+  nextDay?: boolean;
+  copyTomorrow?: boolean;
+  bulk?: boolean;
+  endDate?: string;
+  frequency?: BulkFrequency;
+};
+
+type PeriodMode = 'single' | 'consecutive' | 'weekly' | 'biweekly';
 
 interface EntryFormProps {
   open: boolean;
@@ -21,7 +33,9 @@ interface EntryFormProps {
   initialDate?: string;
   initialData?: CalendarEntryInput & { version?: number; id?: string };
   defaultShared?: boolean;
-  onSave: (date: string, data: CalendarEntryInput, options?: { nextDay?: boolean; copyTomorrow?: boolean; bulk?: boolean; endDate?: string }) => Promise<void>;
+  /** When true, hide Gedeeld/Privé toggle (create via dedicated + Regeling / + Privé). */
+  lockVisibility?: boolean;
+  onSave: (date: string, data: CalendarEntryInput, options?: EntrySaveOptions) => Promise<void>;
   mode?: 'create' | 'edit';
 }
 
@@ -47,6 +61,7 @@ export function EntryForm({
   initialDate,
   initialData,
   defaultShared = true,
+  lockVisibility = false,
   onSave,
   mode = 'create',
 }: EntryFormProps) {
@@ -58,7 +73,7 @@ export function EntryForm({
   const [version, setVersion] = useState<number | undefined>();
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [multiDay, setMultiDay] = useState(false);
+  const [period, setPeriod] = useState<PeriodMode>('single');
 
   const daytimeOptions = useMemo(
     () =>
@@ -120,7 +135,7 @@ export function EntryForm({
       );
       setVersion(initialData?.version);
       setEndDate('');
-      setMultiDay(false);
+      setPeriod('single');
       setError('');
     }
   }, [open, initialDate, initialData, defaultShared]);
@@ -132,11 +147,38 @@ export function EntryForm({
     setForm((prev: CalendarEntryInput) => ({ ...prev, [key]: value }));
   };
 
-  const dayCount = useMemo(() => {
-    if (!multiDay || !endDate || !date) return 1;
-    const days = differenceInCalendarDays(parseISO(endDate), parseISO(date)) + 1;
-    return days > 0 ? days : 1;
-  }, [multiDay, date, endDate]);
+  const setShared = (isShared: boolean) => {
+    update('isShared', isShared);
+    if (!isShared) {
+      setPeriod('single');
+      setEndDate('');
+    }
+  };
+
+  const weekdayLabel = useMemo(() => {
+    try {
+      return format(parseISO(date), 'EEEE', { locale: nl });
+    } catch {
+      return 'weekdag';
+    }
+  }, [date]);
+
+  const bulkDates = useMemo(() => {
+    if (!form.isShared || period === 'single' || !endDate || !date) return [];
+    if (endDate < date) return [];
+    if (period === 'weekly') return getWeeklyDatesInRange(date, endDate);
+    if (period === 'biweekly') return getBiweeklyDatesInRange(date, endDate);
+    return getDatesInRange(date, endDate);
+  }, [form.isShared, period, date, endDate]);
+
+  const useBulk = bulkDates.length > 0;
+  const dayCount = bulkDates.length || 1;
+
+  const frequencyForPeriod = (): BulkFrequency => {
+    if (period === 'weekly') return 'weekly';
+    if (period === 'biweekly') return 'biweekly';
+    return 'daily';
+  };
 
   const handleSave = async (options?: { nextDay?: boolean; copyTomorrow?: boolean }) => {
     if (!isOnline) {
@@ -144,7 +186,7 @@ export function EntryForm({
       return;
     }
 
-    if (multiDay) {
+    if (form.isShared && period !== 'single') {
       if (!endDate) {
         setError('Kies een einddatum voor de periode.');
         return;
@@ -153,20 +195,32 @@ export function EntryForm({
         setError('De einddatum moet op of na de startdatum liggen.');
         return;
       }
+      if (bulkDates.length === 0) {
+        setError('Geen dagen in deze periode.');
+        return;
+      }
     }
 
     setSaving(true);
     setError('');
 
     try {
-      const data = { ...form, version, id: initialData?.id };
-      if (multiDay && endDate) {
-        await onSave(date, data, { bulk: true, endDate });
+      if (useBulk) {
+        // No id/version: bulk must upsert each date independently.
+        const { id: _id, ...bulkForm } = form;
+        void _id;
+        await onSave(date, bulkForm, {
+          bulk: true,
+          endDate,
+          frequency: frequencyForPeriod(),
+        });
       } else if (options?.copyTomorrow) {
+        const data = { ...form, version, id: initialData?.id };
         await onSave(date, data);
         const tomorrow = format(addDays(parseISO(date), 1), 'yyyy-MM-dd');
-        await onSave(tomorrow, { ...data, version: undefined });
+        await onSave(tomorrow, { ...data, version: undefined, id: undefined });
       } else {
+        const data = { ...form, version, id: initialData?.id };
         await onSave(date, data, options);
       }
       onClose();
@@ -187,7 +241,13 @@ export function EntryForm({
 
   const saveLabel = (() => {
     if (saving) return 'Opslaan…';
-    if (multiDay && endDate && dayCount > 1) {
+    if (useBulk && dayCount > 1) {
+      if (period === 'biweekly') {
+        return `Toepassen op ${dayCount}× ${weekdayLabel} (om de 2 weken)`;
+      }
+      if (period === 'weekly') {
+        return `Toepassen op ${dayCount}× ${weekdayLabel}`;
+      }
       return `Toepassen op ${dayCount} dagen`;
     }
     return 'Opslaan';
@@ -216,7 +276,7 @@ export function EntryForm({
       <div className="space-y-4">
         <div>
           <label htmlFor="entry-date" className="mb-1 block text-sm font-medium text-gray-700">
-            Datum
+            {period === 'weekly' || period === 'biweekly' ? 'Eerste dag' : 'Datum'}
           </label>
           <input
             id="entry-date"
@@ -228,63 +288,113 @@ export function EntryForm({
           />
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-          <label className="mb-2 block text-sm font-medium text-gray-700">
-            Zichtbaarheid
-          </label>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => update('isShared', true)}
-              disabled={!isOnline || mode === 'edit'}
-              className={`btn-touch flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                form.isShared
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
-              }`}
-            >
-              Gedeeld
-            </button>
-            <button
-              type="button"
-              onClick={() => update('isShared', false)}
-              disabled={!isOnline || mode === 'edit'}
-              className={`btn-touch flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                !form.isShared
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
-              }`}
-            >
-              Privé
-            </button>
+        {mode === 'edit' || !lockVisibility ? (
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <label className="mb-2 block text-sm font-medium text-gray-700">
+              Zichtbaarheid
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShared(true)}
+                disabled={!isOnline || mode === 'edit'}
+                className={`btn-touch flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  form.isShared
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                }`}
+              >
+                Gedeeld
+              </button>
+              <button
+                type="button"
+                onClick={() => setShared(false)}
+                disabled={!isOnline || mode === 'edit'}
+                className={`btn-touch flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  !form.isShared
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                }`}
+              >
+                Privé
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-gray-600">
+              {form.isShared ? (
+                <>
+                  <span className="font-medium">Kinderregeling (gedeeld):</span> Beide ouders kunnen dit zien en bewerken.
+                </>
+              ) : (
+                <>
+                  <span className="font-medium">Privé afspraak:</span> Alleen jij ziet dit — één dag, geen periode.
+                </>
+              )}
+            </p>
           </div>
-          <p className="mt-2 text-xs text-gray-600">
+        ) : (
+          <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
             {form.isShared ? (
               <>
-                <span className="font-medium">Gedeeld:</span> Beide ouders kunnen dit zien en bewerken.
+                <span className="font-medium">Kinderregeling (gedeeld):</span> Beide ouders kunnen dit zien en bewerken.
               </>
             ) : (
               <>
-                <span className="font-medium">Privé:</span> Alleen jij kunt dit zien. De andere ouder ziet dit niet.
+                <span className="font-medium">Privé afspraak:</span> Alleen jij ziet dit — één dag, geen periode.
               </>
             )}
           </p>
-        </div>
-
-        {mode === 'create' && form.isShared && (
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={multiDay}
-              onChange={(e) => setMultiDay(e.target.checked)}
-              disabled={!isOnline}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            Meerdere opeenvolgende dagen
-          </label>
         )}
 
-        {multiDay && (
+        {form.isShared && (
+          <div>
+            <p className="mb-2 text-sm font-medium text-gray-700">Periode</p>
+            <div className="flex flex-col gap-2">
+              {(
+                [
+                  { value: 'single' as const, label: 'Eén dag' },
+                  { value: 'consecutive' as const, label: 'Opeenvolgende dagen' },
+                  { value: 'weekly' as const, label: `Elke ${weekdayLabel}` },
+                  { value: 'biweekly' as const, label: `Om de 2 weken (${weekdayLabel})` },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    setPeriod(opt.value);
+                    if (opt.value === 'single') setEndDate('');
+                  }}
+                  disabled={!isOnline}
+                  className={`btn-touch rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${
+                    period === opt.value
+                      ? 'bg-blue-600 text-white'
+                      : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {mode === 'edit' && period !== 'single' && (
+              <p className="mt-2 text-xs text-amber-700">
+                Past deze regeling ook toe op de andere dagen in de periode (overschrijft bestaande
+                regelingen op die dagen).
+              </p>
+            )}
+            {period === 'weekly' && (
+              <p className="mt-2 text-xs text-gray-500">
+                Herhaalt op elke {weekdayLabel} van de startdatum tot en met de einddatum.
+              </p>
+            )}
+            {period === 'biweekly' && (
+              <p className="mt-2 text-xs text-gray-500">
+                Herhaalt om de 2 weken op {weekdayLabel}, startend vanaf de gekozen datum.
+              </p>
+            )}
+          </div>
+        )}
+
+        {form.isShared && period !== 'single' && (
           <div>
             <label htmlFor="entry-end-date" className="mb-1 block text-sm font-medium text-gray-700">
               Tot en met
@@ -298,10 +408,18 @@ export function EntryForm({
               disabled={!isOnline}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {endDate && dayCount > 0 && (
+              <p className="mt-1 text-xs text-gray-500">
+                {period === 'weekly'
+                  ? `${dayCount}× ${weekdayLabel} in deze periode`
+                  : period === 'biweekly'
+                    ? `${dayCount}× ${weekdayLabel} (om de 2 weken)`
+                    : `${dayCount} opeenvolgende dagen`}
+              </p>
+            )}
           </div>
         )}
 
-        {/* Shared entry fields */}
         {form.isShared && (
           <>
             <ChoiceButtonGroup
@@ -399,7 +517,6 @@ export function EntryForm({
           </>
         )}
 
-        {/* Private entry fields */}
         {!form.isShared && (
           <>
             <div>
@@ -468,7 +585,7 @@ export function EntryForm({
           >
             {saveLabel}
           </button>
-          {mode === 'create' && !multiDay && form.isShared && (
+          {mode === 'create' && period === 'single' && form.isShared && (
             <>
               <button
                 type="button"

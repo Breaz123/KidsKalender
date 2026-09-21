@@ -24,13 +24,15 @@ async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
+  const headers = new Headers(options.headers);
+  if (options.body != null && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+    headers,
   });
 
   if (!res.ok) {
@@ -83,12 +85,17 @@ export const api = {
       { method: 'DELETE' },
     ),
 
-  bulkEntries: (startDate: string, endDate: string, entry: CalendarEntryInput) =>
+  bulkEntries: (
+    startDate: string,
+    endDate: string,
+    entry: CalendarEntryInput,
+    frequency: 'daily' | 'weekly' | 'biweekly' = 'daily',
+  ) =>
     request<{ results: Array<{ date: string; entry: CalendarEntry | null }> }>(
       '/api/calendar/bulk',
       {
         method: 'POST',
-        body: JSON.stringify({ startDate, endDate, entry }),
+        body: JSON.stringify({ startDate, endDate, entry, frequency }),
       },
     ),
 

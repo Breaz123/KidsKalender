@@ -499,9 +499,15 @@ export async function bulkUpsertEntries(
   userId: string,
   input: CalendarEntryInput,
 ) {
+  // Bulk always upserts per date — never reuse a single entry id/version
+  // (that would silently skip other days when editing then applying a range).
+  const { id: _id, version: _version, ...entry } = input;
+  void _id;
+  void _version;
+
   const results = [];
   for (const date of dates) {
-    const result = await upsertEntry(householdId, date, userId, input);
+    const result = await upsertEntry(householdId, date, userId, entry);
     results.push({ date, ...result });
   }
   return results;
