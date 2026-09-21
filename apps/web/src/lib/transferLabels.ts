@@ -3,14 +3,14 @@ import {
   getPersonLabelFromSettings,
   type Activity,
   type CalendarEntry,
-  type DisplaySettings,
+  type HouseholdDisplaySettings,
   type PersonOption,
 } from '@kids-calendar/shared';
 
 function personName(
   person: PersonOption | null | undefined,
   other: string | null | undefined,
-  settings: DisplaySettings,
+  settings: HouseholdDisplaySettings,
 ): string | null {
   if (!person || person === 'nvt') return null;
   return getPersonLabelFromSettings(person, other, settings);
@@ -19,7 +19,7 @@ function personName(
 /** Compacte maandcel: "Papa school brengen" i.p.v. alleen een naam. */
 export function getBringLabel(
   entry: Pick<CalendarEntry, 'broughtBy' | 'broughtByOther' | 'activity' | 'activityOther'>,
-  settings: DisplaySettings,
+  settings: HouseholdDisplaySettings,
 ): string | null {
   const who = personName(entry.broughtBy, entry.broughtByOther, settings);
   if (!who) return null;
@@ -39,7 +39,7 @@ export function getBringLabel(
 /** Compacte maandcel: "Mama haalt op". */
 export function getPickupLabel(
   entry: Pick<CalendarEntry, 'pickedUpBy' | 'pickedUpByOther'>,
-  settings: DisplaySettings,
+  settings: HouseholdDisplaySettings,
 ): string | null {
   const who = personName(entry.pickedUpBy, entry.pickedUpByOther, settings);
   if (!who) return null;
