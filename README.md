@@ -73,7 +73,7 @@ docker compose up -d --build
 
 Caddy regelt automatisch HTTPS zodra `DOMAIN` naar uw server wijst.
 
-Split hosting (Vercel-frontend + VPS-API) vereist `COOKIE_SAMESITE=none`, `COOKIE_SECURE=true` en `CORS_ORIGIN` gelijk aan de Vercel-origin. Zie [docs/SPLIT_HOSTING.md](docs/SPLIT_HOSTING.md).
+Split hosting (Vercel-frontend + VPS-API): either keep the `vercel.json` `/api` rewrite with empty `VITE_API_URL`, or set `VITE_API_URL` + `COOKIE_SAMESITE=none` + `CORS_ORIGIN` (comma-separated origins allowed). Zie [docs/SPLIT_HOSTING.md](docs/SPLIT_HOSTING.md).
 
 ## Omgevingsvariabelen
 
@@ -87,7 +87,7 @@ Split hosting (Vercel-frontend + VPS-API) vereist `COOKIE_SAMESITE=none`, `COOKI
 | `SESSION_DURATION_HOURS` | Sessieduur in uren (standaard 90 dagen) | `2160` |
 | `COOKIE_SECURE` | Secure-cookie (`true` in productie) | `false` |
 | `COOKIE_SAMESITE` | Cookie SameSite: `lax` (default), `strict`, of `none` | `lax` |
-| `CORS_ORIGIN` | Toegestane frontend-origin (exact) | `http://localhost:5173` |
+| `CORS_ORIGIN` | Toegestane frontend-origin(s), komma-gescheiden | `http://localhost:5173` |
 | `DOMAIN` | Productiedomein voor Caddy | `kalender.example.com` |
 | `ACME_EMAIL` | E-mail voor Let's Encrypt | `admin@example.com` |
 | `VITE_API_URL` | API-URL voor frontend build | `http://localhost:3001` |

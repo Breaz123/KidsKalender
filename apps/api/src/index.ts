@@ -7,6 +7,7 @@ import { authRoutes, settingsRoutes } from './routes/auth.routes.js';
 import { calendarRoutes, exportRoutes, importRoutes } from './routes/calendar.routes.js';
 import { cleanupExpiredSessions } from './services/auth.service.js';
 import { closeDb } from './db/index.js';
+import { corsOriginDelegate } from './lib/cors.js';
 
 const PORT = parseInt(process.env.API_PORT ?? '3001', 10);
 const HOST = process.env.API_HOST ?? '0.0.0.0';
@@ -15,11 +16,13 @@ export async function buildApp() {
   const app = Fastify({
     logger: process.env.NODE_ENV !== 'test',
     bodyLimit: 1048576,
+    // Honor X-Forwarded-For from Caddy / Vercel rewrites so login rate limits
+    // key on the real client IP instead of a shared edge address.
     trustProxy: true,
   });
 
   await app.register(cors, {
-    origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+    origin: (origin, cb) => corsOriginDelegate(origin, cb),
     credentials: true,
   });
 
@@ -32,6 +35,13 @@ export async function buildApp() {
     global: true,
     max: 100,
     timeWindow: '1 minute',
+    errorResponseBuilder: (_request, context) => ({
+      statusCode: 429,
+      error: {
+        code: 'RATE_LIMITED',
+        message: `Te veel verzoeken. Probeer het over ${Math.ceil(context.ttl / 1000)} seconden opnieuw.`,
+      },
+    }),
   });
 
   app.get('/api/health', async () => ({
