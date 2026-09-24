@@ -48,7 +48,9 @@ export default defineConfig({
             options: {
               cacheName: 'calendar-api',
               expiration: { maxEntries: 50, maxAgeSeconds: 86400 },
-              networkTimeoutSeconds: 5,
+              networkTimeoutSeconds: 8,
+              // Never cache auth failures or 5xx from brief API blips.
+              cacheableResponse: { statuses: [200] },
             },
           },
         ],

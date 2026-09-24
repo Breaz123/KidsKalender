@@ -1,5 +1,4 @@
 import type {
-  ApiError,
   AuthUser,
   CalendarEntry,
   CalendarEntryInput,
@@ -36,16 +35,41 @@ async function request<T>(
   });
 
   if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as ApiError | null;
+    const body = (await res.json().catch(() => null)) as Record<
+      string,
+      unknown
+    > | null;
+
+    const nested =
+      body && typeof body.error === 'object' && body.error !== null
+        ? (body.error as { code?: string; message?: string; details?: Record<string, unknown> })
+        : null;
+    const topMessage =
+      typeof body?.message === 'string' && body.message.trim()
+        ? body.message.trim()
+        : typeof body?.error === 'string'
+          ? body.error
+          : null;
+
     const fallbackMessage =
       res.status === 429
         ? 'Te veel inlogpogingen. Probeer het later opnieuw.'
-        : 'Er is een fout opgetreden.';
+        : res.status >= 500
+          ? 'Kon de kalender niet laden. Probeer het opnieuw.'
+          : 'Er is een fout opgetreden.';
+
+    const rawMessage = nested?.message || topMessage || fallbackMessage;
+    const message =
+      /internal\s*(server\s*)?error/i.test(rawMessage) ||
+      rawMessage === 'Internal Server Error'
+        ? fallbackMessage
+        : rawMessage;
+
     throw new ApiClientError(
-      (typeof body?.error === 'object' && body.error?.code) ||
-        (res.status === 429 ? 'RATE_LIMITED' : 'UNKNOWN'),
-      (typeof body?.error === 'object' && body.error?.message) || fallbackMessage,
-      typeof body?.error === 'object' ? body.error?.details : undefined,
+      nested?.code ||
+        (res.status === 429 ? 'RATE_LIMITED' : `HTTP_${res.status}`),
+      message,
+      nested?.details,
     );
   }
 
