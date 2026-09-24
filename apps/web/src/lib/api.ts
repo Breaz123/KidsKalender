@@ -37,10 +37,15 @@ async function request<T>(
 
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as ApiError | null;
+    const fallbackMessage =
+      res.status === 429
+        ? 'Te veel inlogpogingen. Probeer het later opnieuw.'
+        : 'Er is een fout opgetreden.';
     throw new ApiClientError(
-      body?.error?.code ?? 'UNKNOWN',
-      body?.error?.message ?? 'Er is een fout opgetreden.',
-      body?.error?.details,
+      (typeof body?.error === 'object' && body.error?.code) ||
+        (res.status === 429 ? 'RATE_LIMITED' : 'UNKNOWN'),
+      (typeof body?.error === 'object' && body.error?.message) || fallbackMessage,
+      typeof body?.error === 'object' ? body.error?.details : undefined,
     );
   }
 

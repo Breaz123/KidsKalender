@@ -25,8 +25,17 @@ export async function authRoutes(app: FastifyInstance) {
   app.post('/login', {
     config: {
       rateLimit: {
-        max: process.env.NODE_ENV === 'production' ? 5 : 30,
+        // Slightly higher in production: Vercel→API rewrites can share egress
+        // paths; 5/15m locked real users out after a few typos.
+        max: process.env.NODE_ENV === 'production' ? 20 : 30,
         timeWindow: '15 minutes',
+        errorResponseBuilder: (_request, context) => ({
+          statusCode: 429,
+          error: {
+            code: 'RATE_LIMITED',
+            message: `Te veel inlogpogingen. Probeer het over ${Math.ceil(context.ttl / 1000)} seconden opnieuw.`,
+          },
+        }),
       },
     },
   }, async (request, reply) => {
