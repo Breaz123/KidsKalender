@@ -1,5 +1,4 @@
 import type {
-  ApiError,
   AuthUser,
   CalendarEntry,
   CalendarEntryInput,
@@ -36,21 +35,16 @@ async function request<T>(
   });
 
   if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as
-      | ApiError
-      | {
-          statusCode?: number;
-          error?: string | ApiError['error'];
-          message?: string;
-        }
-      | null;
+    const body = (await res.json().catch(() => null)) as Record<
+      string,
+      unknown
+    > | null;
 
-    const apiError =
+    const nested =
       body && typeof body.error === 'object' && body.error !== null
-        ? body.error
+        ? (body.error as { code?: string; message?: string; details?: Record<string, unknown> })
         : null;
-    // Fastify default errors use { error: "Internal Server Error", message: "..." }.
-    const fastifyMessage =
+    const topMessage =
       typeof body?.message === 'string' && body.message.trim()
         ? body.message.trim()
         : typeof body?.error === 'string'
@@ -64,7 +58,7 @@ async function request<T>(
           ? 'Kon de kalender niet laden. Probeer het opnieuw.'
           : 'Er is een fout opgetreden.';
 
-    const rawMessage = apiError?.message || fastifyMessage || fallbackMessage;
+    const rawMessage = nested?.message || topMessage || fallbackMessage;
     const message =
       /internal\s*(server\s*)?error/i.test(rawMessage) ||
       rawMessage === 'Internal Server Error'
@@ -72,10 +66,10 @@ async function request<T>(
         : rawMessage;
 
     throw new ApiClientError(
-      apiError?.code ||
+      nested?.code ||
         (res.status === 429 ? 'RATE_LIMITED' : `HTTP_${res.status}`),
       message,
-      apiError?.details,
+      nested?.details,
     );
   }
 
