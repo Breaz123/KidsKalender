@@ -31,11 +31,20 @@ export function useCalendarMonth(year: number, month: number) {
     queryFn: async () => {
       try {
         const data = await api.getCalendar(year, month);
-        await cacheCalendarMonth(year, month, data.entries);
+        // IndexedDB failures must not surface as calendar load errors.
+        try {
+          await cacheCalendarMonth(year, month, data.entries);
+        } catch {
+          /* ignore cache write errors */
+        }
         return data.entries;
       } catch (err) {
-        const cached = await getCachedCalendarMonth(year, month);
-        if (cached) return cached.entries;
+        try {
+          const cached = await getCachedCalendarMonth(year, month);
+          if (cached) return cached.entries;
+        } catch {
+          /* ignore cache read errors */
+        }
         throw err;
       }
     },

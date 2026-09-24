@@ -49,8 +49,23 @@ export async function calendarRoutes(app: FastifyInstance) {
       return sendError(reply, 400, 'VALIDATION_ERROR', 'Ongeldige maand of jaar.');
     }
 
-    const entries = await getEntriesForMonth(request.user!.householdId, request.user!.id, y, m);
-    return { entries };
+    try {
+      const entries = await getEntriesForMonth(
+        request.user!.householdId,
+        request.user!.id,
+        y,
+        m,
+      );
+      return { entries };
+    } catch (err) {
+      request.log.error(err, 'Kalender maand ophalen mislukt');
+      return sendError(
+        reply,
+        500,
+        'INTERNAL_ERROR',
+        'Kon de kalender niet laden. Probeer het opnieuw.',
+      );
+    }
   });
 
   app.get('/:date/all', async (request, reply) => {
